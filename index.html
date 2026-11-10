@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Autonomous Racing - Genetic Algorithm Simulator</title>
+  <title>Universal AI Autonomous Racing Simulator - Multi-Model Benchmark</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -30,7 +30,6 @@
       font-family: 'Inter', sans-serif;
       user-select: none;
     }
-    /* Custom Scrollbars */
     ::-webkit-scrollbar {
       width: 6px;
     }
@@ -49,62 +48,85 @@
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col overflow-x-hidden">
 
   <!-- Header / Navbar -->
-  <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
+  <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-50">
     <div class="flex items-center gap-3">
-      <div class="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-500/30 flex items-center justify-center">
-        <i class="fa-solid fa-car-side text-xl text-white"></i>
+      <div class="bg-gradient-to-tr from-indigo-600 to-cyan-500 p-2.5 rounded-xl shadow-lg shadow-indigo-500/30 flex items-center justify-center">
+        <i class="fa-solid fa-code-compare text-xl text-white"></i>
       </div>
       <div>
-        <h1 class="text-xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">
-          NEURAL RACER GA
+        <h1 class="text-xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-cyan-400 to-emerald-400">
+          AI MODEL BENCHMARK ARENA
         </h1>
-        <p class="text-xs text-slate-400 font-medium">유전 알고리즘 기반 AI 자율주행 레이싱 시뮬레이터</p>
+        <p class="text-xs text-slate-400 font-medium">유전 알고리즘(GA) vs Q-Learning/RL 강화학습 모델 실시간 동시 비교</p>
       </div>
     </div>
 
-    <!-- Quick Actions -->
-    <div class="flex items-center gap-3">
-      <button id="btn-toggle-player" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition flex items-center gap-2 border border-slate-700">
-        <i class="fa-solid fa-gamepad text-indigo-400"></i>
-        <span>플레이어 차량: <b id="player-status-text" class="text-emerald-400">켜짐</b></span>
-      </button>
-      <button id="btn-toggle-sensors" class="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition flex items-center gap-2 border border-slate-700">
-        <i class="fa-solid fa-wifi text-cyan-400"></i>
-        <span>센서 표시: <b id="sensors-status-text" class="text-emerald-400">켜짐</b></span>
-      </button>
-      <button id="btn-restart" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center gap-2">
-        <i class="fa-solid fa-rotate-right"></i>
-        <span>시뮬레이션 리셋</span>
-      </button>
+    <!-- Legend & Quick Actions -->
+    <div class="flex items-center gap-4 flex-wrap">
+      <div class="flex items-center gap-3 text-xs bg-slate-950/60 border border-slate-800 px-3 py-1.5 rounded-xl">
+        <span class="flex items-center gap-1.5 font-semibold text-indigo-400">
+          <span class="w-3 h-3 rounded-full bg-indigo-500 inline-block shadow-sm shadow-indigo-500"></span> GA (신경망+유전)
+        </span>
+        <span class="flex items-center gap-1.5 font-semibold text-cyan-400">
+          <span class="w-3 h-3 rounded-full bg-cyan-400 inline-block shadow-sm shadow-cyan-400"></span> Policy RL (Q-Learning)
+        </span>
+        <span class="flex items-center gap-1.5 font-semibold text-emerald-400">
+          <span class="w-3 h-3 rounded-full bg-emerald-400 inline-block shadow-sm shadow-emerald-400"></span> 유저 직접 운전
+        </span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btn-toggle-player" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition border border-slate-700">
+          <i class="fa-solid fa-gamepad text-emerald-400"></i> 유저 차량: <b id="player-status-text" class="text-emerald-400">켜짐</b>
+        </button>
+        <button id="btn-toggle-sensors" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition border border-slate-700">
+          <i class="fa-solid fa-wifi text-cyan-400"></i> 센서: <b id="sensors-status-text" class="text-emerald-400">켜짐</b>
+        </button>
+        <button id="btn-restart" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-rotate-right"></i> 전체 초기화
+        </button>
+      </div>
     </div>
   </header>
 
   <!-- Main Container -->
-  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 p-4 md:p-6 max-w-[1920px] mx-auto w-full">
+  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 p-4 md:p-6 max-w-[1920px] mx-auto w-full">
     
-    <!-- Left Panel: Canvas Display -->
+    <!-- Left Panel: Canvas Display & Comparison Chart -->
     <div class="lg:col-span-8 xl:col-span-9 flex flex-col gap-4">
       <div class="relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex-1 flex items-center justify-center min-h-[500px]">
         
-        <!-- Canvas -->
+        <!-- Simulation Canvas -->
         <canvas id="sim-canvas" class="w-full h-full block bg-slate-950 cursor-crosshair"></canvas>
 
-        <!-- Overlay Floating Badge: Generation Speed -->
-        <div class="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md border border-slate-700/60 rounded-xl p-3 shadow-xl flex items-center gap-4 text-xs font-semibold">
-          <div class="flex items-center gap-2 text-indigo-400">
+        <!-- Speed Selector Overlay -->
+        <div class="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md border border-slate-700/60 rounded-xl p-2.5 shadow-xl flex items-center gap-3 text-xs font-semibold">
+          <div class="flex items-center gap-1.5 text-indigo-400">
             <i class="fa-solid fa-bolt"></i>
-            <span>실행 속도:</span>
+            <span>속도:</span>
           </div>
           <div class="flex gap-1" id="speed-buttons">
             <button data-speed="1" class="speed-btn px-2.5 py-1 rounded bg-indigo-600 text-white shadow">1x</button>
             <button data-speed="2" class="speed-btn px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">2x</button>
             <button data-speed="5" class="speed-btn px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">5x</button>
-            <button data-speed="10" class="speed-btn px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">10x (초고속)</button>
+            <button data-speed="10" class="speed-btn px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">10x</button>
+          </div>
+        </div>
+
+        <!-- Custom Track Editor Control Banner Overlay -->
+        <div id="editor-banner" class="hidden absolute top-4 right-4 bg-amber-950/90 border border-amber-600/60 backdrop-blur-md rounded-xl p-3 text-xs flex items-center gap-3 shadow-2xl z-20">
+          <div class="text-amber-400 font-semibold flex items-center gap-1.5">
+            <i class="fa-solid fa-pen-ruler animate-bounce"></i>
+            <span>트랙 커스텀 편집 중 (화면 클릭으로 마디 추가)</span>
+          </div>
+          <div class="flex gap-2">
+            <button id="btn-clear-track" class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">초기화</button>
+            <button id="btn-finish-track" class="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow">트랙 완성 및 학습 시작</button>
           </div>
         </div>
 
         <!-- Touch Controls for Mobile/Player Car -->
-        <div id="touch-controls" class="absolute bottom-4 right-4 md:hidden flex flex-col gap-2 pointer-events-auto">
+        <div id="touch-controls" class="absolute bottom-4 right-4 md:hidden flex flex-col gap-2 pointer-events-auto z-10">
           <div class="flex justify-center">
             <button id="btn-up" class="w-12 h-12 bg-slate-800/80 active:bg-indigo-600 rounded-xl text-white flex items-center justify-center border border-slate-700 text-lg">▲</button>
           </div>
@@ -114,127 +136,147 @@
             <button id="btn-right" class="w-12 h-12 bg-slate-800/80 active:bg-indigo-600 rounded-xl text-white flex items-center justify-center border border-slate-700 text-lg">►</button>
           </div>
         </div>
+      </div>
 
-        <!-- Top Car Info Card Overlay -->
-        <div class="absolute bottom-4 left-4 bg-slate-900/90 backdrop-blur-md border border-slate-700/60 rounded-xl p-3.5 shadow-xl min-w-[220px]">
-          <div class="flex items-center gap-2 mb-2 pb-2 border-b border-slate-800">
-            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
-            <span class="text-xs font-bold text-amber-400 uppercase tracking-wider">현재 1위 AI (Leader)</span>
+      <!-- Live Performance Comparison Chart (SVG Canvas) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+            <i class="fa-solid fa-chart-line text-indigo-400"></i> 세대별 최고 피트니스 점수 추이 비교 (Live Learning Curves)
+          </h3>
+          <div class="flex gap-4 text-xs">
+            <span class="flex items-center gap-1.5 text-indigo-400 font-semibold"><span class="w-2.5 h-0.5 bg-indigo-500 inline-block"></span> GA Model</span>
+            <span class="flex items-center gap-1.5 text-cyan-400 font-semibold"><span class="w-2.5 h-0.5 bg-cyan-400 inline-block"></span> Policy RL Model</span>
           </div>
-          <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-            <span class="text-slate-400">최고 피트니스:</span>
-            <span id="stat-leader-fitness" class="font-mono font-bold text-slate-200">0</span>
-            <span class="text-slate-400">현재 속도:</span>
-            <span id="stat-leader-speed" class="font-mono text-cyan-400">0 km/h</span>
-            <span class="text-slate-400">경과 체크포인트:</span>
-            <span id="stat-leader-cp" class="font-mono text-emerald-400">0 / 0</span>
-          </div>
+        </div>
+        <div class="h-28 w-full bg-slate-950 border border-slate-800 rounded-xl p-2 relative">
+          <canvas id="chart-canvas" class="w-full h-full block"></canvas>
         </div>
       </div>
     </div>
 
-    <!-- Right Panel: Controls & Dashboard UI -->
+    <!-- Right Panel: Controls & Multi-Model Stats -->
     <div class="lg:col-span-4 xl:col-span-3 flex flex-col gap-5">
       
-      <!-- Realtime Statistics Card -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-        <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <i class="fa-solid fa-chart-line text-indigo-400"></i> 실시간 학습 현황
+      <!-- Multi-Model Split Metrics Dashboard Table -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
+        <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-trophy text-amber-400"></i> 모델별 실시간 성과 비교
         </h2>
-        
+
+        <!-- Comparison Cards -->
         <div class="grid grid-cols-2 gap-3">
-          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3">
-            <p class="text-[10px] text-slate-400 uppercase font-semibold">현재 세대 (Gen)</p>
-            <p id="stat-generation" class="text-2xl font-black text-indigo-400 font-mono mt-1">1</p>
+          
+          <!-- GA Model Card -->
+          <div class="bg-slate-950 border border-indigo-900/60 rounded-xl p-3 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-12 h-12 bg-indigo-600/10 rounded-bl-full pointer-events-none"></div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-black text-indigo-400">GA (Evolutionary)</span>
+              <span id="ga-status-badge" class="text-[10px] bg-indigo-950 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-800">Gen <b id="stat-ga-gen">1</b></span>
+            </div>
+            <div class="space-y-1 text-xs">
+              <div class="flex justify-between"><span class="text-slate-400">생존 차량:</span><span id="stat-ga-alive" class="font-mono font-bold text-slate-200">0/0</span></div>
+              <div class="flex justify-between"><span class="text-slate-400">최고 점수:</span><span id="stat-ga-fit" class="font-mono font-bold text-amber-400">0</span></div>
+              <div class="flex justify-between"><span class="text-slate-400">완주 랩타임:</span><span id="stat-ga-time" class="font-mono text-cyan-400">--</span></div>
+            </div>
           </div>
-          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3">
-            <p class="text-[10px] text-slate-400 uppercase font-semibold">생존 AI 수</p>
-            <p id="stat-alive" class="text-2xl font-black text-emerald-400 font-mono mt-1">0 / 0</p>
+
+          <!-- Policy RL Card -->
+          <div class="bg-slate-950 border border-cyan-900/60 rounded-xl p-3 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-12 h-12 bg-cyan-600/10 rounded-bl-full pointer-events-none"></div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-black text-cyan-400">Policy RL (Q-Net)</span>
+              <span id="rl-status-badge" class="text-[10px] bg-cyan-950 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-800">Ep <b id="stat-rl-ep">1</b></span>
+            </div>
+            <div class="space-y-1 text-xs">
+              <div class="flex justify-between"><span class="text-slate-400">생존 차량:</span><span id="stat-rl-alive" class="font-mono font-bold text-slate-200">0/0</span></div>
+              <div class="flex justify-between"><span class="text-slate-400">최고 점수:</span><span id="stat-rl-fit" class="font-mono font-bold text-amber-400">0</span></div>
+              <div class="flex justify-between"><span class="text-slate-400">탐험율 (ε):</span><span id="stat-rl-epsilon" class="font-mono text-emerald-400">100%</span></div>
+            </div>
           </div>
-          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3">
-            <p class="text-[10px] text-slate-400 uppercase font-semibold">역대 최고 기록</p>
-            <p id="stat-alltime-fitness" class="text-xl font-bold text-amber-400 font-mono mt-1">0</p>
-          </div>
-          <div class="bg-slate-950 border border-slate-800 rounded-xl p-3">
-            <p class="text-[10px] text-slate-400 uppercase font-semibold">최단 완주 시간</p>
-            <p id="stat-best-time" class="text-xl font-bold text-cyan-400 font-mono mt-1">--:--</p>
-          </div>
+
         </div>
       </div>
 
-      <!-- Genetic Algorithm Parameters Form -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col gap-5">
-        <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-          <i class="fa-solid fa-sliders text-cyan-400"></i> 유전 알고리즘 설정
+      <!-- Settings & Generalization Suite -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex-1 flex flex-col gap-4 text-xs">
+        <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-cyan-400"></i> 시뮬레이션 & 범용성 실험 설정
         </h2>
 
-        <!-- Population Size Slider -->
+        <!-- Track Selection & Generalization Stress Test -->
         <div class="space-y-2">
-          <div class="flex justify-between text-xs">
-            <label for="slider-pop" class="text-slate-300 font-medium">개체 수 (Population)</label>
-            <span id="val-pop" class="text-indigo-400 font-mono font-bold">100</span>
-          </div>
-          <input type="range" id="slider-pop" min="20" max="300" step="10" value="100" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
-          <p class="text-[11px] text-slate-400">한 세대당 동시에 생성할 AI 자동차의 개수입니다.</p>
-        </div>
-
-        <!-- Mutation Rate Slider -->
-        <div class="space-y-2">
-          <div class="flex justify-between text-xs">
-            <label for="slider-mutation" class="text-slate-300 font-medium">변이율 (Mutation Rate)</label>
-            <span id="val-mutation" class="text-indigo-400 font-mono font-bold">10%</span>
-          </div>
-          <input type="range" id="slider-mutation" min="1" max="50" step="1" value="10" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
-          <p class="text-[11px] text-slate-400">다음 세대 생성 시 신경망 가중치가 랜덤하게 변경될 확률입니다.</p>
-        </div>
-
-        <!-- Track Selection -->
-        <div class="space-y-2">
-          <label class="text-xs text-slate-300 font-medium">트랙 코스 선택</label>
-          <select id="select-track" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 font-medium">
-            <option value="oval">스피드 서킷 (기본 Oval)</option>
-            <option value="complex">테크니컬 코너링 트랙</option>
+          <label class="text-slate-300 font-medium flex justify-between items-center">
+            <span>트랙 선택 및 환경</span>
+            <button id="btn-gen-random" class="hidden text-[11px] text-indigo-400 hover:text-indigo-300 underline"><i class="fa-solid fa-shuffle"></i> 트랙 재생성</button>
+          </label>
+          <select id="select-track" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 focus:outline-none focus:border-indigo-500 font-medium">
+            <option value="oval">스피드 서킷 (Basic Oval)</option>
+            <option value="complex">테크니컬 곡선 서킷</option>
+            <option value="procedural">무작위 자동 생성 트랙 (Procedural)</option>
+            <option value="custom">유저 직접 그리기 (Custom Edit)</option>
           </select>
         </div>
 
-        <hr class="border-slate-800 my-1">
+        <div class="flex items-center justify-between bg-slate-950 border border-slate-800 p-2.5 rounded-xl">
+          <div class="space-y-0.5">
+            <p class="font-semibold text-slate-200">세대마다 무작위 트랙 변형</p>
+            <p class="text-[10px] text-slate-400">범용 주행(Generalization) 성능을 검증합니다.</p>
+          </div>
+          <input type="checkbox" id="chk-auto-regen" class="w-4 h-4 text-indigo-600 bg-slate-800 border-slate-700 rounded focus:ring-indigo-500 cursor-pointer">
+        </div>
 
-        <!-- Keyboard Guide -->
-        <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3.5 space-y-2">
-          <p class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-            <i class="fa-solid fa-keyboard text-slate-400"></i> 플레이어 차 직접 조종법
-          </p>
-          <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-400">
-            <div><kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200">▲</kbd> / <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200">W</kbd> 가속</div>
-            <div><kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200">▼</kbd> / <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200">S</kbd> 감속/후진</div>
-            <div><kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200">◄</kbd> / <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200">A</kbd> 좌회전</div>
-            <div><kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200">►</kbd> / <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200">D</kbd> 우회전</div>
+        <!-- Model Activation Checkboxes -->
+        <div class="space-y-1.5">
+          <label class="text-slate-400 font-medium">참여 학습 모델 선택</label>
+          <div class="flex gap-4 bg-slate-950 border border-slate-800 p-2.5 rounded-xl">
+            <label class="flex items-center gap-2 cursor-pointer font-semibold text-indigo-400">
+              <input type="checkbox" id="chk-enable-ga" checked class="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-indigo-500"> GA 모델
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer font-semibold text-cyan-400">
+              <input type="checkbox" id="chk-enable-rl" checked class="rounded bg-slate-800 border-slate-700 text-cyan-600 focus:ring-cyan-500"> Policy RL 모델
+            </label>
           </div>
         </div>
 
+        <!-- Population / Hyperparameters Slider -->
+        <div class="space-y-2">
+          <div class="flex justify-between">
+            <label for="slider-pop" class="text-slate-300 font-medium">모델당 차량 수 (Population)</label>
+            <span id="val-pop" class="text-indigo-400 font-mono font-bold">50</span>
+          </div>
+          <input type="range" id="slider-pop" min="10" max="150" step="10" value="50" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+        </div>
+
+        <div class="space-y-2">
+          <div class="flex justify-between">
+            <label for="slider-mutation" class="text-slate-300 font-medium">GA 변이율 / RL 학습률</label>
+            <span id="val-mutation" class="text-indigo-400 font-mono font-bold">10%</span>
+          </div>
+          <input type="range" id="slider-mutation" min="1" max="40" step="1" value="10" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+        </div>
+
         <!-- Next Generation Force Button -->
-        <button id="btn-next-gen" class="mt-auto w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs transition flex items-center justify-center gap-2">
+        <button id="btn-next-gen" class="mt-auto w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold transition flex items-center justify-center gap-2">
           <i class="fa-solid fa-forward-step"></i>
-          <span>현재 세대 즉시 강제 종료 및 다음 세대 생성</span>
+          <span>새 세대 / 에피소드 즉시 교체</span>
         </button>
 
       </div>
     </div>
   </main>
 
-  <!-- JavaScript Core Engine -->
+  <!-- JavaScript Core Engine with GA & Policy RL -->
   <script>
     /**
-     * NEURAL RACER GA ENGINE
-     * Self-contained Pure JS Physics, Artificial Neural Network & Genetic Algorithm
+     * UNIVERSAL MULTI-MODEL AI RACING SIMULATOR
+     * GA (Genetic Algorithm) vs Policy Gradient / Lightweight RL Comparison Engine
      */
 
-    // --- 1. UTILITY FUNCTIONS ---
     function distance(x1, y1, x2, y2) {
-      return Math.hypot(2 - x1, y2 - y1);
+      return Math.hypot(x2 - x1, y2 - y1);
     }
 
-    // Line intersection (Raycasting against line segments)
     function getIntersection(A, B, C, D) {
       const tTop = (D.x - C.x) * (A.y - C.y) - (D.y - C.y) * (A.x - C.x);
       const uTop = (C.y - A.y) * (A.x - B.x) - (C.x - A.x) * (A.y - B.y);
@@ -254,14 +296,13 @@
       return null;
     }
 
-    // --- 2. ARTIFICIAL NEURAL NETWORK (ANN) ---
+    // --- 1. NEURAL NETWORK FOR GA & RL ---
     class NeuralNetwork {
       constructor(inputNodes, hiddenNodes, outputNodes) {
         this.inputNodes = inputNodes;
         this.hiddenNodes = hiddenNodes;
         this.outputNodes = outputNodes;
 
-        // Weights & Biases
         this.weightsIH = new Array(this.hiddenNodes).fill(0).map(() => 
           new Array(this.inputNodes).fill(0).map(() => (Math.random() * 2 - 1))
         );
@@ -273,13 +314,11 @@
         this.biasO = new Array(this.outputNodes).fill(0).map(() => Math.random() * 2 - 1);
       }
 
-      // Activation Function: Tanh (Returns value between -1 and 1)
       static sigmoid(x) {
         return Math.tanh(x);
       }
 
       predict(inputs) {
-        // Input -> Hidden
         let hidden = [];
         for (let i = 0; i < this.hiddenNodes; i++) {
           let sum = 0;
@@ -290,7 +329,6 @@
           hidden[i] = NeuralNetwork.sigmoid(sum);
         }
 
-        // Hidden -> Output
         let outputs = [];
         for (let i = 0; i < this.outputNodes; i++) {
           let sum = 0;
@@ -304,7 +342,6 @@
         return outputs;
       }
 
-      // Clone Neural Network
       clone() {
         const nn = new NeuralNetwork(this.inputNodes, this.hiddenNodes, this.outputNodes);
         for (let i = 0; i < this.hiddenNodes; i++) {
@@ -322,15 +359,8 @@
         return nn;
       }
 
-      // Mutation for Genetic Algorithm
       mutate(rate) {
-        const mutateVal = (val) => {
-          if (Math.random() < rate) {
-            // Add gaussian-like noise
-            return val + (Math.random() * 0.8 - 0.4);
-          }
-          return val;
-        };
+        const mutateVal = (val) => (Math.random() < rate ? val + (Math.random() * 0.8 - 0.4) : val);
 
         for (let i = 0; i < this.hiddenNodes; i++) {
           for (let j = 0; j < this.inputNodes; j++) {
@@ -346,73 +376,85 @@
           this.biasO[i] = mutateVal(this.biasO[i]);
         }
       }
+
+      // Online Policy Gradient Step for RL Model
+      applyGradient(inputs, actionGradients, lr = 0.05) {
+        let hidden = [];
+        for (let i = 0; i < this.hiddenNodes; i++) {
+          let sum = 0;
+          for (let j = 0; j < this.inputNodes; j++) {
+            sum += inputs[j] * this.weightsIH[i][j];
+          }
+          sum += this.biasH[i];
+          hidden[i] = NeuralNetwork.sigmoid(sum);
+        }
+
+        for (let o = 0; o < this.outputNodes; o++) {
+          const grad = actionGradients[o] * lr;
+          for (let h = 0; h < this.hiddenNodes; h++) {
+            this.weightsHO[o][h] += hidden[h] * grad;
+          }
+          this.biasO[o] += grad;
+        }
+      }
     }
 
-    // --- 3. CAR & SENSOR SIMULATION ---
+    // --- 2. CAR OBJECT ---
     class Car {
-      constructor(x, y, angle = 0, isPlayer = false) {
+      constructor(x, y, angle = 0, modelType = 'GA') {
         this.x = x;
         this.y = y;
-        this.width = 30;
-        this.height = 16;
+        this.width = 28;
+        this.height = 14;
         this.angle = angle;
         
         this.speed = 0;
-        this.maxSpeed = isPlayer ? 4.5 : 4.0;
+        this.maxSpeed = modelType === 'HUMAN' ? 4.5 : 4.0;
         this.friction = 0.04;
         this.acceleration = 0.15;
 
-        this.isPlayer = isPlayer;
+        this.modelType = modelType; // 'GA', 'RL', 'HUMAN'
         this.damaged = false;
 
-        // Ray Sensors: Angles relative to car heading [-90, -45, 0, 45, 90]
         this.sensorRayAngles = [-Math.PI / 2, -Math.PI / 4, 0, Math.PI / 4, Math.PI / 2];
-        this.sensorRange = 150;
+        this.sensorRange = 160;
         this.readings = [];
 
-        // AI Controls & Brain
-        if (!isPlayer) {
-          // Inputs: 5 Ray readings + current speed normalized = 6 inputs
-          // Hidden: 8, Output: 2 (Steering, Throttle)
-          this.brain = new NeuralNetwork(6, 8, 2);
+        if (modelType !== 'HUMAN') {
+          // 9 Inputs: 5 sensors + target rel sin + target rel cos + dist + speed
+          this.brain = new NeuralNetwork(9, 10, 2);
         }
 
-        // GA Stats
         this.fitness = 0;
         this.distanceTraveled = 0;
         this.currentCheckpoint = 0;
         this.lapsCompleted = 0;
         this.timeAlive = 0;
         this.timeSinceCheckpoint = 0;
+
+        this.lastInputs = null;
+        this.lastOutputs = null;
       }
 
-      update(borders, checkpoints, keys = {}) {
+      update(borders, checkpoints, keys = {}, epsilon = 0.1, learningRate = 0.05) {
         if (this.damaged) return;
 
         this.timeAlive++;
         this.timeSinceCheckpoint++;
 
-        // 1. Update Sensors & Readings
         this.updateSensors(borders);
 
-        // 2. Control logic
-        if (this.isPlayer) {
+        if (this.modelType === 'HUMAN') {
           this.handleHumanControls(keys);
         } else {
-          this.handleAIControls();
+          this.handleAIControls(checkpoints, epsilon, learningRate);
         }
 
-        // 3. Physics & Movement
         this.move();
-
-        // 4. Collision Detection with Borders
         this.checkCollision(borders);
-
-        // 5. Checkpoints & Fitness evaluation
         this.evaluateProgress(checkpoints);
 
-        // Auto-kill if stuck/idle for too long (180 frames = 3 seconds without checkpoint)
-        if (!this.isPlayer && this.timeSinceCheckpoint > 240 && Math.abs(this.speed) < 0.3) {
+        if (this.modelType !== 'HUMAN' && this.timeSinceCheckpoint > 260 && Math.abs(this.speed) < 0.3) {
           this.damaged = true;
         }
       }
@@ -437,7 +479,6 @@
           if (touches.length === 0) {
             this.readings.push(null);
           } else {
-            // Get closest intersection
             const offsets = touches.map(e => e.offset);
             const minOffset = Math.min(...offsets);
             const closestTouch = touches.find(e => e.offset === minOffset);
@@ -457,28 +498,65 @@
         }
       }
 
-      handleAIControls() {
-        // Normalize inputs between 0 and 1
+      handleAIControls(checkpoints, epsilon = 0.1, learningRate = 0.05) {
         const inputs = [];
+
         for (let i = 0; i < this.readings.length; i++) {
-          if (this.readings[i] == null) {
-            inputs.push(1.0); // No wall detected in range
-          } else {
-            inputs.push(1.0 - this.readings[i].offset);
-          }
+          inputs.push(this.readings[i] == null ? 1.0 : 1.0 - this.readings[i].offset);
         }
-        // Normalize Speed (0 ~ 1)
+
+        if (checkpoints && checkpoints.length > 0) {
+          const nextCPIndex = (this.currentCheckpoint + 1) % checkpoints.length;
+          const targetCP = checkpoints[nextCPIndex];
+          const cpCenterX = (targetCP.p1.x + targetCP.p2.x) / 2;
+          const cpCenterY = (targetCP.p1.y + targetCP.p2.y) / 2;
+
+          const angleToTarget = Math.atan2(cpCenterY - this.y, cpCenterX - this.x);
+          let relativeAngle = angleToTarget - this.angle;
+
+          while (relativeAngle > Math.PI) relativeAngle -= Math.PI * 2;
+          while (relativeAngle < -Math.PI) relativeAngle += Math.PI * 2;
+
+          inputs.push(Math.sin(relativeAngle));
+          inputs.push(Math.cos(relativeAngle));
+
+          const distToCP = distance(this.x, this.y, cpCenterX, cpCenterY);
+          inputs.push(Math.min(1.0, distToCP / 500));
+        } else {
+          inputs.push(0, 1, 1);
+        }
+
         inputs.push(this.speed / this.maxSpeed);
 
-        const outputs = this.brain.predict(inputs);
+        let outputs = this.brain.predict(inputs);
 
-        // Output 0: Steering (-1 to 1) -> Rotate
-        const steer = outputs[0]; 
-        // Output 1: Throttle (-1 to 1) -> Accelerate or Brake
-        const throttle = outputs[1];
+        // Policy RL Online Exploration & Reward Feedback Update
+        if (this.modelType === 'RL') {
+          if (Math.random() < epsilon) {
+            outputs[0] = Math.random() * 2 - 1; // Random Steering
+            outputs[1] = Math.random() * 2 - 1; // Random Speed
+          }
 
-        this.angle += steer * 0.06;
-        this.speed += throttle * this.acceleration;
+          if (this.lastInputs) {
+            // Immediate Reward Function: High speed towards checkpoint - penalty on wall proximity
+            const minWallDist = Math.min(...inputs.slice(0, 5));
+            let reward = this.speed > 0.5 ? 0.2 : -0.1;
+            if (minWallDist < 0.25) reward -= 0.5;
+
+            // Policy update
+            const gradients = [
+              outputs[0] * reward,
+              outputs[1] * reward
+            ];
+            this.brain.applyGradient(this.lastInputs, gradients, learningRate);
+          }
+
+          this.lastInputs = inputs;
+          this.lastOutputs = outputs;
+        }
+
+        this.angle += outputs[0] * 0.06;
+        this.speed += outputs[1] * this.acceleration;
       }
 
       move() {
@@ -544,7 +622,6 @@
         const targetCPIndex = (this.currentCheckpoint + 1) % checkpoints.length;
         const targetCP = checkpoints[targetCPIndex];
 
-        // Car center vs Checkpoint segment intersection or proximity
         const poly = this.getPolygon();
         for (let i = 0; i < poly.length; i++) {
           const p1 = poly[i];
@@ -560,13 +637,11 @@
           }
         }
 
-        // Calculate fitness: (Checkpoints passed * 500) + Total Distance - Penalties
-        this.fitness = (this.lapsCompleted * checkpoints.length + this.currentCheckpoint) * 500 + Math.floor(this.distanceTraveled);
+        this.fitness = (this.lapsCompleted * checkpoints.length + this.currentCheckpoint) * 600 + Math.floor(this.distanceTraveled);
       }
 
       draw(ctx, showSensors = false, isLeader = false) {
-        // 1. Draw Sensors
-        if (showSensors && !this.damaged) {
+        if (showSensors && !this.damaged && isLeader) {
           for (let i = 0; i < this.sensorRayAngles.length; i++) {
             const rayAngle = this.angle + this.sensorRayAngles[i];
             let endX = this.x + Math.cos(rayAngle) * this.sensorRange;
@@ -580,36 +655,28 @@
             ctx.beginPath();
             ctx.moveTo(this.x, this.y);
             ctx.lineTo(endX, endY);
-            ctx.strokeStyle = this.readings[i] ? 'rgba(239, 68, 68, 0.4)' : 'rgba(56, 189, 248, 0.2)';
+            ctx.strokeStyle = this.readings[i] ? 'rgba(239, 68, 68, 0.5)' : (this.modelType === 'GA' ? 'rgba(99, 102, 241, 0.3)' : 'rgba(34, 211, 238, 0.3)');
             ctx.lineWidth = 1;
             ctx.stroke();
-
-            if (this.readings[i]) {
-              ctx.beginPath();
-              ctx.arc(endX, endY, 3, 0, Math.PI * 2);
-              ctx.fillStyle = '#ef4444';
-              ctx.fill();
-            }
           }
         }
 
-        // 2. Draw Car Body
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
 
         if (this.damaged) {
-          ctx.fillStyle = 'rgba(71, 85, 105, 0.4)';
+          ctx.fillStyle = 'rgba(51, 65, 85, 0.3)';
           ctx.strokeStyle = '#334155';
-        } else if (this.isPlayer) {
-          ctx.fillStyle = '#10b981'; // Emerald Player
+        } else if (this.modelType === 'HUMAN') {
+          ctx.fillStyle = '#10b981';
           ctx.strokeStyle = '#059669';
-        } else if (isLeader) {
-          ctx.fillStyle = '#f59e0b'; // Amber Leader AI
-          ctx.strokeStyle = '#d97706';
-        } else {
-          ctx.fillStyle = 'rgba(99, 102, 241, 0.6)'; // Indigo Normal AI
-          ctx.strokeStyle = 'rgba(79, 70, 229, 0.8)';
+        } else if (this.modelType === 'GA') {
+          ctx.fillStyle = isLeader ? '#818cf8' : 'rgba(99, 102, 241, 0.6)';
+          ctx.strokeStyle = '#4f46e5';
+        } else if (this.modelType === 'RL') {
+          ctx.fillStyle = isLeader ? '#38bdf8' : 'rgba(34, 211, 238, 0.6)';
+          ctx.strokeStyle = '#0284c7';
         }
 
         ctx.lineWidth = 2;
@@ -618,34 +685,20 @@
         ctx.fill();
         ctx.stroke();
 
-        // Windshield
-        if (!this.damaged) {
-          ctx.fillStyle = '#0f172a';
-          ctx.fillRect(0, -this.height / 3, this.width / 4, (this.height * 2) / 3);
-        }
-
-        // Leader highlight ring
-        if (isLeader && !this.damaged) {
-          ctx.beginPath();
-          ctx.arc(0, 0, 22, 0, Math.PI * 2);
-          ctx.strokeStyle = '#fbbf24';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([4, 4]);
-          ctx.stroke();
-        }
-
         ctx.restore();
       }
     }
 
-    // --- 4. TRACK GENERATOR ---
+    // --- 3. TRACK & GENERATOR ---
     class Track {
-      constructor(type = 'oval', width, height) {
+      constructor(type = 'oval', width, height, customWaypoints = []) {
         this.width = width;
         this.height = height;
         this.borders = [];
         this.checkpoints = [];
         this.startPos = { x: 150, y: height / 2, angle: -Math.PI / 2 };
+        this.type = type;
+        this.customWaypoints = customWaypoints;
         this.buildTrack(type);
       }
 
@@ -659,8 +712,60 @@
         const cx = this.width / 2;
         const cy = this.height / 2;
 
-        if (type === 'complex') {
-          // Technical curvy circuit
+        if (type === 'custom' && this.customWaypoints.length >= 3) {
+          const pts = this.customWaypoints;
+          const trackWidth = 120;
+
+          for (let i = 0; i < pts.length; i++) {
+            const prev = pts[(i - 1 + pts.length) % pts.length];
+            const curr = pts[i];
+            const next = pts[(i + 1) % pts.length];
+
+            const dx = next.x - prev.x;
+            const dy = next.y - prev.y;
+            const angle = Math.atan2(dy, dx) + Math.PI / 2;
+
+            outerPoints.push({
+              x: curr.x + Math.cos(angle) * (trackWidth / 2),
+              y: curr.y + Math.sin(angle) * (trackWidth / 2)
+            });
+            innerPoints.push({
+              x: curr.x - Math.cos(angle) * (trackWidth / 2),
+              y: curr.y - Math.sin(angle) * (trackWidth / 2)
+            });
+          }
+
+          const startDir = Math.atan2(pts[1].y - pts[0].y, pts[1].x - pts[0].x);
+          this.startPos = { x: pts[0].x, y: pts[0].y, angle: startDir };
+
+        } else if (type === 'procedural') {
+          const pointsCount = 14 + Math.floor(Math.random() * 6);
+          const rx = this.width * 0.38;
+          const ry = this.height * 0.36;
+          const trackWidth = 130;
+
+          const seed = Math.random() * 100;
+          for (let i = 0; i < pointsCount; i++) {
+            const angle = (i / pointsCount) * Math.PI * 2;
+            const noise = Math.sin(angle * 4 + seed) * 70 + Math.cos(angle * 3 + seed * 2) * 50;
+            const rCenter = Math.min(rx, ry) + noise;
+
+            const cX = cx + Math.cos(angle) * rCenter;
+            const cY = cy + Math.sin(angle) * rCenter;
+
+            outerPoints.push({ x: cX + Math.cos(angle) * (trackWidth / 2), y: cY + Math.sin(angle) * (trackWidth / 2) });
+            innerPoints.push({ x: cX - Math.cos(angle) * (trackWidth / 2), y: cY - Math.sin(angle) * (trackWidth / 2) });
+          }
+
+          const dx = outerPoints[1].x - outerPoints[0].x;
+          const dy = outerPoints[1].y - outerPoints[0].y;
+          this.startPos = { 
+            x: (outerPoints[0].x + innerPoints[0].x) / 2, 
+            y: (outerPoints[0].y + innerPoints[0].y) / 2, 
+            angle: Math.atan2(dy, dx) 
+          };
+
+        } else if (type === 'complex') {
           const pointsCount = 16;
           const rx = this.width * 0.38;
           const ry = this.height * 0.36;
@@ -675,13 +780,12 @@
             innerPoints.push({ x: cx + Math.cos(angle) * rIn, y: cy + Math.sin(angle) * rIn });
           }
           this.startPos = { x: outerPoints[0].x - 65, y: outerPoints[0].y, angle: Math.PI / 2 };
+
         } else {
-          // Default Oval Speedway
           const trackWidth = 140;
           const w = this.width * 0.35;
           const h = this.height * 0.3;
 
-          // Outer Track Loop
           outerPoints = [
             { x: cx - w, y: cy - h },
             { x: cx + w, y: cy - h },
@@ -691,7 +795,6 @@
             { x: cx - w - 120, y: cy }
           ];
 
-          // Inner Track Loop
           innerPoints = [
             { x: cx - w, y: cy - h + trackWidth },
             { x: cx + w, y: cy - h + trackWidth },
@@ -704,24 +807,15 @@
           this.startPos = { x: cx, y: cy + h - trackWidth / 2, angle: 0 };
         }
 
-        // Convert polygon points into border line segments
         for (let i = 0; i < outerPoints.length; i++) {
           const nextIndex = (i + 1) % outerPoints.length;
           this.borders.push({ p1: outerPoints[i], p2: outerPoints[nextIndex] });
           this.borders.push({ p1: innerPoints[i], p2: innerPoints[nextIndex] });
-
-          // Create Checkpoint line segment spanning inner to outer
           this.checkpoints.push({ p1: innerPoints[i], p2: outerPoints[i] });
         }
       }
 
       draw(ctx) {
-        // 1. Track Ground/Asphalt
-        ctx.strokeStyle = '#1e293b';
-        ctx.lineWidth = 120;
-        ctx.lineJoin = 'round';
-
-        // 2. Draw Track Outer/Inner Walls
         ctx.strokeStyle = '#38bdf8';
         ctx.lineWidth = 3;
         ctx.shadowColor = '#0284c7';
@@ -735,7 +829,6 @@
         }
         ctx.shadowBlur = 0;
 
-        // 3. Draw Checkpoints (Faint lines)
         ctx.strokeStyle = 'rgba(241, 245, 249, 0.08)';
         ctx.lineWidth = 1;
         for (let cp of this.checkpoints) {
@@ -745,7 +838,6 @@
           ctx.stroke();
         }
 
-        // 4. Start/Finish Line Indicator
         if (this.checkpoints.length > 0) {
           const startCP = this.checkpoints[0];
           ctx.beginPath();
@@ -758,26 +850,95 @@
       }
     }
 
-    // --- 5. SIMULATION CONTROLLER & GENETIC ALGORITHM ---
-    class Simulation {
+    // --- 4. LIVE COMPARISON CHART RENDERER ---
+    class BenchmarkChart {
+      constructor(canvasId) {
+        this.canvas = document.getElementById(canvasId);
+        this.ctx = this.canvas.getContext('2d');
+        this.gaData = [];
+        this.rlData = [];
+        this.initResize();
+      }
+
+      initResize() {
+        const resize = () => {
+          this.canvas.width = this.canvas.parentElement.clientWidth - 16;
+          this.canvas.height = this.canvas.parentElement.clientHeight - 16;
+        };
+        window.addEventListener('resize', resize);
+        resize();
+      }
+
+      addData(gaFitness, rlFitness) {
+        this.gaData.push(gaFitness);
+        this.rlData.push(rlFitness);
+        if (this.gaData.length > 30) {
+          this.gaData.shift();
+          this.rlData.shift();
+        }
+        this.draw();
+      }
+
+      clear() {
+        this.gaData = [];
+        this.rlData = [];
+        this.draw();
+      }
+
+      draw() {
+        const w = this.canvas.width;
+        const h = this.canvas.height;
+        this.ctx.clearRect(0, 0, w, h);
+
+        if (this.gaData.length < 2) return;
+
+        const maxFit = Math.max(...this.gaData, ...this.rlData, 1000);
+
+        const drawLine = (data, color) => {
+          this.ctx.beginPath();
+          this.ctx.strokeStyle = color;
+          this.ctx.lineWidth = 2.5;
+
+          const stepX = w / (data.length - 1);
+          for (let i = 0; i < data.length; i++) {
+            const x = i * stepX;
+            const y = h - (data[i] / maxFit) * (h - 10) - 5;
+            if (i === 0) this.ctx.moveTo(x, y);
+            else this.ctx.lineTo(x, y);
+          }
+          this.ctx.stroke();
+        };
+
+        drawLine(this.gaData, '#6366f1');
+        drawLine(this.rlData, '#22d3ee');
+      }
+    }
+
+    // --- 5. MAIN MULTI-MODEL SIMULATION CONTROLLER ---
+    class MultiModelSimulation {
       constructor() {
         this.canvas = document.getElementById('sim-canvas');
         this.ctx = this.canvas.getContext('2d');
 
-        // State parameters
-        this.popSize = 100;
+        this.popSize = 50;
         this.mutationRate = 0.10;
         this.simSpeed = 1;
-        this.generation = 1;
-        this.showSensors = true;
+
+        this.gaGen = 1;
+        this.rlEp = 1;
+        this.rlEpsilon = 1.0;
+
+        this.enableGA = true;
+        this.enableRL = true;
         this.enablePlayer = true;
+        this.showSensors = true;
 
-        this.allTimeBestFitness = 0;
-        this.bestLapTime = null;
-        this.generationFrameCount = 0;
-
-        // Key states
+        this.autoRegenTrack = false;
+        this.isEditingCustomTrack = false;
+        this.customWaypoints = [];
         this.keys = {};
+
+        this.chart = new BenchmarkChart('chart-canvas');
 
         this.initResize();
         this.initEvents();
@@ -790,8 +951,8 @@
           const rect = this.canvas.parentElement.getBoundingClientRect();
           this.canvas.width = rect.width;
           this.canvas.height = rect.height;
-          if (this.track) {
-            this.track = new Track(document.getElementById('select-track').value, this.canvas.width, this.canvas.height);
+          if (this.track && !this.isEditingCustomTrack) {
+            this.track = new Track(document.getElementById('select-track').value, this.canvas.width, this.canvas.height, this.customWaypoints);
           }
         };
         window.addEventListener('resize', resize);
@@ -799,11 +960,15 @@
       }
 
       initEvents() {
-        // Keyboard Listener
         window.addEventListener('keydown', (e) => this.keys[e.key] = true);
         window.addEventListener('keyup', (e) => this.keys[e.key] = false);
 
-        // UI Controls listeners
+        this.canvas.addEventListener('click', (e) => {
+          if (!this.isEditingCustomTrack) return;
+          const rect = this.canvas.getBoundingClientRect();
+          this.customWaypoints.push({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+        });
+
         document.getElementById('slider-pop').addEventListener('input', (e) => {
           this.popSize = parseInt(e.target.value);
           document.getElementById('val-pop').textContent = this.popSize;
@@ -814,20 +979,69 @@
           document.getElementById('val-mutation').textContent = `${e.target.value}%`;
         });
 
-        document.getElementById('select-track').addEventListener('change', (e) => {
-          this.track = new Track(e.target.value, this.canvas.width, this.canvas.height);
+        document.getElementById('chk-auto-regen').addEventListener('change', (e) => {
+          this.autoRegenTrack = e.target.checked;
+        });
+
+        document.getElementById('chk-enable-ga').addEventListener('change', (e) => {
+          this.enableGA = e.target.checked;
+        });
+
+        document.getElementById('chk-enable-rl').addEventListener('change', (e) => {
+          this.enableRL = e.target.checked;
+        });
+
+        const selectTrack = document.getElementById('select-track');
+        const btnGenRandom = document.getElementById('btn-gen-random');
+        const editorBanner = document.getElementById('editor-banner');
+
+        selectTrack.addEventListener('change', (e) => {
+          const val = e.target.value;
+          btnGenRandom.classList.toggle('hidden', val !== 'procedural');
+
+          if (val === 'custom') {
+            this.isEditingCustomTrack = true;
+            this.customWaypoints = [];
+            editorBanner.classList.remove('hidden');
+          } else {
+            this.isEditingCustomTrack = false;
+            editorBanner.classList.add('hidden');
+            this.track = new Track(val, this.canvas.width, this.canvas.height);
+            this.resetSimulation();
+          }
+        });
+
+        btnGenRandom.addEventListener('click', () => {
+          this.track = new Track('procedural', this.canvas.width, this.canvas.height);
+          this.resetSimulation();
+        });
+
+        document.getElementById('btn-clear-track').addEventListener('click', () => {
+          this.customWaypoints = [];
+        });
+
+        document.getElementById('btn-finish-track').addEventListener('click', () => {
+          if (this.customWaypoints.length < 3) {
+            alert('최소 3개 이상의 웨이포인트를 생성해야 합니다.');
+            return;
+          }
+          this.isEditingCustomTrack = false;
+          editorBanner.classList.add('hidden');
+          this.track = new Track('custom', this.canvas.width, this.canvas.height, this.customWaypoints);
           this.resetSimulation();
         });
 
         document.getElementById('btn-restart').addEventListener('click', () => {
-          this.generation = 1;
-          this.allTimeBestFitness = 0;
-          this.bestLapTime = null;
+          this.gaGen = 1;
+          this.rlEp = 1;
+          this.rlEpsilon = 1.0;
+          this.chart.clear();
           this.resetSimulation();
         });
 
         document.getElementById('btn-next-gen').addEventListener('click', () => {
-          this.nextGeneration();
+          this.evolveGABatch();
+          this.resetRLBatch();
         });
 
         document.getElementById('btn-toggle-sensors').addEventListener('click', () => {
@@ -843,34 +1057,18 @@
           statusText.textContent = this.enablePlayer ? '켜짐' : '꺼짐';
           statusText.className = this.enablePlayer ? 'text-emerald-400' : 'text-slate-400';
           if (this.enablePlayer && !this.playerCar) {
-            this.playerCar = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, true);
+            this.playerCar = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'HUMAN');
           }
         });
 
-        // Speed multiplier buttons
         const speedButtons = document.querySelectorAll('.speed-btn');
         speedButtons.forEach(btn => {
           btn.addEventListener('click', () => {
-            speedButtons.forEach(b => {
-              b.className = 'speed-btn px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300';
-            });
+            speedButtons.forEach(b => b.className = 'speed-btn px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300');
             btn.className = 'speed-btn px-2.5 py-1 rounded bg-indigo-600 text-white shadow';
             this.simSpeed = parseInt(btn.dataset.speed);
           });
         });
-
-        // Touch Control Triggers for mobile
-        const bindTouch = (id, keyName) => {
-          const btn = document.getElementById(id);
-          if (!btn) return;
-          btn.addEventListener('pointerdown', (e) => { e.preventDefault(); this.keys[keyName] = true; });
-          btn.addEventListener('pointerup', (e) => { e.preventDefault(); this.keys[keyName] = false; });
-          btn.addEventListener('pointerleave', (e) => { e.preventDefault(); this.keys[keyName] = false; });
-        };
-        bindTouch('btn-up', 'ArrowUp');
-        bindTouch('btn-down', 'ArrowDown');
-        bindTouch('btn-left', 'ArrowLeft');
-        bindTouch('btn-right', 'ArrowRight');
       }
 
       resetSimulation() {
@@ -878,111 +1076,131 @@
           this.track = new Track('oval', this.canvas.width, this.canvas.height);
         }
 
-        this.cars = [];
-        for (let i = 0; i < this.popSize; i++) {
-          this.cars.push(new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, false));
+        this.gaCars = [];
+        if (this.enableGA) {
+          for (let i = 0; i < this.popSize; i++) {
+            this.gaCars.push(new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'GA'));
+          }
         }
 
-        if (this.enablePlayer) {
-          this.playerCar = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, true);
-        } else {
-          this.playerCar = null;
+        this.rlCars = [];
+        if (this.enableRL) {
+          for (let i = 0; i < this.popSize; i++) {
+            this.rlCars.push(new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'RL'));
+          }
         }
 
-        this.generationFrameCount = 0;
+        this.playerCar = this.enablePlayer ? new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'HUMAN') : null;
+        this.frameCount = 0;
       }
 
-      // --- GENETIC ALGORITHM SELECTION & REPRODUCTION ---
-      nextGeneration() {
-        // Sort AI cars by fitness descending
-        this.cars.sort((a, b) => b.fitness - a.fitness);
+      evolveGABatch() {
+        if (this.gaCars.length === 0) return;
 
-        const newCars = [];
+        this.gaCars.sort((a, b) => b.fitness - a.fitness);
+        const bestGA = this.gaCars[0].fitness;
 
-        // 1. Elitism: Retain top 10% best performing AI cars directly
+        const newGACars = [];
         const eliteCount = Math.max(1, Math.floor(this.popSize * 0.1));
+
         for (let i = 0; i < eliteCount; i++) {
-          const eliteCar = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, false);
-          eliteCar.brain = this.cars[i].brain.clone();
-          newCars.push(eliteCar);
+          const elite = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'GA');
+          elite.brain = this.gaCars[i].brain.clone();
+          newGACars.push(elite);
         }
 
-        // 2. Crossover & Mutation for remaining offsprings
-        while (newCars.length < this.popSize) {
-          const parentA = this.selectParent();
-          const parentB = this.selectParent();
-          const childBrain = this.crossover(parentA.brain, parentB.brain);
-          
+        while (newGACars.length < this.popSize) {
+          const pA = this.selectGAParent();
+          const pB = this.selectGAParent();
+          const childBrain = pA.brain.clone();
+
+          for (let i = 0; i < childBrain.hiddenNodes; i++) {
+            for (let j = 0; j < childBrain.inputNodes; j++) {
+              if (Math.random() < 0.5) childBrain.weightsIH[i][j] = pB.brain.weightsIH[i][j];
+            }
+          }
           childBrain.mutate(this.mutationRate);
 
-          const childCar = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, false);
-          childCar.brain = childBrain;
-          newCars.push(childCar);
+          const child = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'GA');
+          child.brain = childBrain;
+          newGACars.push(child);
         }
 
-        this.cars = newCars;
-        this.generation++;
-        this.generationFrameCount = 0;
-
-        // Reset player car if present
-        if (this.enablePlayer) {
-          this.playerCar = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, true);
-        }
+        this.gaCars = newGACars;
+        this.gaGen++;
+        return bestGA;
       }
 
-      // Tournament Selection
-      selectParent() {
-        const tournamentSize = 5;
+      selectGAParent() {
         let best = null;
-        for (let i = 0; i < tournamentSize; i++) {
-          const randomCar = this.cars[Math.floor(Math.random() * this.cars.length)];
-          if (!best || randomCar.fitness > best.fitness) {
-            best = randomCar;
-          }
+        for (let i = 0; i < 4; i++) {
+          const r = this.gaCars[Math.floor(Math.random() * this.gaCars.length)];
+          if (!best || r.fitness > best.fitness) best = r;
         }
         return best;
       }
 
-      // Crossover two Neural Networks
-      crossover(brainA, brainB) {
-        const child = brainA.clone();
-        for (let i = 0; i < child.hiddenNodes; i++) {
-          for (let j = 0; j < child.inputNodes; j++) {
-            if (Math.random() < 0.5) {
-              child.weightsIH[i][j] = brainB.weightsIH[i][j];
-            }
-          }
+      resetRLBatch() {
+        if (this.rlCars.length === 0) return;
+
+        this.rlCars.sort((a, b) => b.fitness - a.fitness);
+        const bestRL = this.rlCars[0].fitness;
+
+        const topBrain = this.rlCars[0].brain.clone();
+        this.rlEpsilon = Math.max(0.05, this.rlEpsilon * 0.92);
+
+        const newRLCars = [];
+        for (let i = 0; i < this.popSize; i++) {
+          const car = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'RL');
+          car.brain = topBrain.clone();
+          if (i > 0) car.brain.mutate(this.mutationRate * 0.5);
+          newRLCars.push(car);
         }
-        for (let i = 0; i < child.outputNodes; i++) {
-          for (let j = 0; j < child.hiddenNodes; j++) {
-            if (Math.random() < 0.5) {
-              child.weightsHO[i][j] = brainB.weightsHO[i][j];
-            }
-          }
-        }
-        return child;
+
+        this.rlCars = newRLCars;
+        this.rlEp++;
+        return bestRL;
       }
 
       update() {
-        // Multi-step update for fast-forwarding speed
-        for (let step = 0; step < this.simSpeed; step++) {
-          this.generationFrameCount++;
+        if (this.isEditingCustomTrack) return;
 
-          // Update AI cars
-          let aliveCount = 0;
-          for (let car of this.cars) {
+        for (let step = 0; step < this.simSpeed; step++) {
+          this.frameCount++;
+
+          let gaAlive = 0;
+          for (let car of this.gaCars) {
             car.update(this.track.borders, this.track.checkpoints);
-            if (!car.damaged) aliveCount++;
+            if (!car.damaged) gaAlive++;
           }
 
-          // Update Player Car
+          let rlAlive = 0;
+          for (let car of this.rlCars) {
+            car.update(this.track.borders, this.track.checkpoints, {}, this.rlEpsilon, this.mutationRate * 0.5);
+            if (!car.damaged) rlAlive++;
+          }
+
           if (this.playerCar) {
             this.playerCar.update(this.track.borders, this.track.checkpoints, this.keys);
           }
 
-          // Auto generation transition if all AI cars damaged or time limit reached (1500 frames)
-          if (aliveCount === 0 || this.generationFrameCount > 1800) {
-            this.nextGeneration();
+          const totalAlive = gaAlive + rlAlive;
+          if (totalAlive === 0 || this.frameCount > 1800) {
+            const bestGA = this.evolveGABatch() || 0;
+            const bestRL = this.resetRLBatch() || 0;
+
+            this.chart.addData(bestGA, bestRL);
+
+            if (this.autoRegenTrack) {
+              const currentTrackType = document.getElementById('select-track').value;
+              this.track = new Track(currentTrackType === 'custom' ? 'custom' : 'procedural', this.canvas.width, this.canvas.height, this.customWaypoints);
+            }
+
+            if (this.playerCar) {
+              this.playerCar = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'HUMAN');
+            }
+
+            this.frameCount = 0;
             break;
           }
         }
@@ -991,60 +1209,65 @@
       draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Draw Circuit
+        if (this.isEditingCustomTrack) {
+          this.ctx.strokeStyle = '#475569';
+          this.ctx.lineWidth = 1;
+          this.ctx.setLineDash([6, 6]);
+
+          for (let i = 0; i < this.customWaypoints.length; i++) {
+            const pt = this.customWaypoints[i];
+            const next = this.customWaypoints[(i + 1) % this.customWaypoints.length];
+
+            this.ctx.beginPath();
+            this.ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+            this.ctx.fillStyle = '#f59e0b';
+            this.ctx.fill();
+
+            if (this.customWaypoints.length > 1) {
+              this.ctx.beginPath();
+              this.ctx.moveTo(pt.x, pt.y);
+              this.ctx.lineTo(next.x, next.y);
+              this.ctx.stroke();
+            }
+          }
+          this.ctx.setLineDash([]);
+          return;
+        }
+
         this.track.draw(this.ctx);
 
-        // Find Leader AI Car
-        let leaderCar = this.cars[0];
-        for (let car of this.cars) {
-          if (car.fitness > leaderCar.fitness) {
-            leaderCar = car;
-          }
-        }
+        let leaderGA = this.gaCars.length > 0 ? this.gaCars.reduce((max, c) => c.fitness > max.fitness ? c : max, this.gaCars[0]) : null;
+        let leaderRL = this.rlCars.length > 0 ? this.rlCars.reduce((max, c) => c.fitness > max.fitness ? c : max, this.rlCars[0]) : null;
 
-        // Draw Non-Leader AI Cars first
-        for (let car of this.cars) {
-          if (car !== leaderCar) {
-            car.draw(this.ctx, false, false);
-          }
-        }
+        for (let car of this.gaCars) if (car !== leaderGA) car.draw(this.ctx, false, false);
+        for (let car of this.rlCars) if (car !== leaderRL) car.draw(this.ctx, false, false);
 
-        // Draw Leader AI Car on top with sensors
-        if (leaderCar) {
-          leaderCar.draw(this.ctx, this.showSensors, true);
-        }
+        if (leaderGA) leaderGA.draw(this.ctx, this.showSensors, true);
+        if (leaderRL) leaderRL.draw(this.ctx, this.showSensors, true);
 
-        // Draw Player Car
-        if (this.playerCar) {
-          this.playerCar.draw(this.ctx, this.showSensors, false);
-        }
+        if (this.playerCar) this.playerCar.draw(this.ctx, this.showSensors, false);
 
-        // Update UI Stats Text
-        this.updateUI(leaderCar);
+        this.updateDashboard(leaderGA, leaderRL);
       }
 
-      updateUI(leaderCar) {
-        const aliveCount = this.cars.filter(c => !c.damaged).length;
+      updateDashboard(leaderGA, leaderRL) {
+        document.getElementById('stat-ga-gen').textContent = this.gaGen;
+        document.getElementById('stat-rl-ep').textContent = this.rlEp;
 
-        document.getElementById('stat-generation').textContent = this.generation;
-        document.getElementById('stat-alive').textContent = `${aliveCount} / ${this.popSize}`;
+        const gaAlive = this.gaCars.filter(c => !c.damaged).length;
+        const rlAlive = this.rlCars.filter(c => !c.damaged).length;
 
-        if (leaderCar) {
-          const currentFit = Math.floor(leaderCar.fitness);
-          document.getElementById('stat-leader-fitness').textContent = currentFit;
-          document.getElementById('stat-leader-speed').textContent = `${(leaderCar.speed * 20).toFixed(0)} km/h`;
-          document.getElementById('stat-leader-cp').textContent = `${leaderCar.currentCheckpoint} / ${this.track.checkpoints.length}`;
+        document.getElementById('stat-ga-alive').textContent = `${gaAlive}/${this.gaCars.length}`;
+        document.getElementById('stat-rl-alive').textContent = `${rlAlive}/${this.rlCars.length}`;
 
-          if (currentFit > this.allTimeBestFitness) {
-            this.allTimeBestFitness = currentFit;
-          }
-          document.getElementById('stat-alltime-fitness').textContent = this.allTimeBestFitness;
+        if (leaderGA) {
+          document.getElementById('stat-ga-fit').textContent = Math.floor(leaderGA.fitness);
+          document.getElementById('stat-ga-time').textContent = leaderGA.lapsCompleted > 0 ? `${(this.frameCount/60).toFixed(1)}s` : '--';
+        }
 
-          if (leaderCar.lapsCompleted > 0 && !this.bestLapTime) {
-            const seconds = (this.generationFrameCount / 60).toFixed(1);
-            this.bestLapTime = `${seconds}s`;
-            document.getElementById('stat-best-time').textContent = this.bestLapTime;
-          }
+        if (leaderRL) {
+          document.getElementById('stat-rl-fit').textContent = Math.floor(leaderRL.fitness);
+          document.getElementById('stat-rl-epsilon').textContent = `${(this.rlEpsilon * 100).toFixed(0)}%`;
         }
       }
 
@@ -1055,9 +1278,8 @@
       }
     }
 
-    // --- 6. INITIALIZATION ON WINDOW LOAD ---
     window.addEventListener('load', () => {
-      window.sim = new Simulation();
+      window.sim = new MultiModelSimulation();
     });
   </script>
 </body>
