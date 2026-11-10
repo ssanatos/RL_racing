@@ -57,7 +57,7 @@
         <h1 class="text-xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-cyan-400 to-emerald-400">
           AI MODEL BENCHMARK ARENA
         </h1>
-        <p class="text-xs text-slate-400 font-medium">유전 알고리즘(GA) vs Q-Learning/RL 강화학습 모델 실시간 동시 비교</p>
+        <p class="text-xs text-slate-400 font-medium">유전 알고리즘(GA) vs PPO 강화학습 모델 실시간 동시 비교</p>
       </div>
     </div>
 
@@ -68,7 +68,7 @@
           <span class="w-3 h-3 rounded-full bg-indigo-500 inline-block shadow-sm shadow-indigo-500"></span> GA (신경망+유전)
         </span>
         <span class="flex items-center gap-1.5 font-semibold text-cyan-400">
-          <span class="w-3 h-3 rounded-full bg-cyan-400 inline-block shadow-sm shadow-cyan-400"></span> Policy RL (Q-Learning)
+          <span class="w-3 h-3 rounded-full bg-cyan-400 inline-block shadow-sm shadow-cyan-400"></span> Policy RL (PPO)
         </span>
         <span class="flex items-center gap-1.5 font-semibold text-emerald-400">
           <span class="w-3 h-3 rounded-full bg-emerald-400 inline-block shadow-sm shadow-emerald-400"></span> 유저 직접 운전
@@ -185,13 +185,14 @@
           <div class="bg-slate-950 border border-cyan-900/60 rounded-xl p-3 relative overflow-hidden">
             <div class="absolute top-0 right-0 w-12 h-12 bg-cyan-600/10 rounded-bl-full pointer-events-none"></div>
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-black text-cyan-400">Policy RL (Q-Net)</span>
+              <span class="text-xs font-black text-cyan-400">Policy RL (PPO Actor-Critic)</span>
               <span id="rl-status-badge" class="text-[10px] bg-cyan-950 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-800">Ep <b id="stat-rl-ep">1</b></span>
             </div>
             <div class="space-y-1 text-xs">
               <div class="flex justify-between"><span class="text-slate-400">생존 차량:</span><span id="stat-rl-alive" class="font-mono font-bold text-slate-200">0/0</span></div>
               <div class="flex justify-between"><span class="text-slate-400">최고 점수:</span><span id="stat-rl-fit" class="font-mono font-bold text-amber-400">0</span></div>
-              <div class="flex justify-between"><span class="text-slate-400">탐험율 (ε):</span><span id="stat-rl-epsilon" class="font-mono text-emerald-400">100%</span></div>
+              <div class="flex justify-between"><span class="text-slate-400">탐색 σ:</span><span id="stat-rl-std" class="font-mono text-emerald-400">0.50</span></div>
+              <div class="flex justify-between"><span class="text-slate-400">평균 리턴:</span><span id="stat-rl-ret" class="font-mono font-bold text-slate-200">0</span></div>
             </div>
           </div>
 
@@ -399,63 +400,294 @@
       }
     }
 
+    // --- 1-B. UTIL ---
+    const HALF_LOG_2PI = 0.5 * Math.log(2 * Math.PI);
+    const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+    function randn() {
+      let u = 0;
+      while (u === 0) u = Math.random();
+      const v = Math.random();
+      return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    }
+
+    // --- 1-C. 1-hidden-layer MLP (수동 역전파 + Adam) ---
+    class TinyMLP {
+      constructor(nIn, nHid, nOut, nExtra = 0, outScale = 1.0) {
+        this.nIn = nIn; this.nHid = nHid; this.nOut = nOut; this.nExtra = nExtra;
+        this.oB1 = nHid * nIn;
+        this.oW2 = this.oB1 + nHid;
+        this.oB2 = this.oW2 + nOut * nHid;
+        this.oExtra = this.oB2 + nOut;
+        const total = this.oExtra + nExtra;
+        this.p = new Float64Array(total);
+        this.g = new Float64Array(total);
+        this.m = new Float64Array(total);
+        this.v = new Float64Array(total);
+        this.t = 0;
+        const s1 = Math.sqrt(1 / nIn);
+        const s2 = Math.sqrt(1 / nHid) * outScale;
+        for (let k = 0; k < this.oB1; k++) this.p[k] = randn() * s1;
+        for (let k = this.oW2; k < this.oB2; k++) this.p[k] = randn() * s2;
+        this._dh = new Float64Array(nHid);
+      }
+
+      forward(x, h, out) {
+        const { nIn, nHid, nOut, p, oB1, oW2, oB2 } = this;
+        for (let i = 0; i < nHid; i++) {
+          let s = p[oB1 + i];
+          const row = i * nIn;
+          for (let j = 0; j < nIn; j++) s += p[row + j] * x[j];
+          h[i] = Math.tanh(s);
+        }
+        for (let o = 0; o < nOut; o++) {
+          let s = p[oB2 + o];
+          const row = oW2 + o * nHid;
+          for (let i = 0; i < nHid; i++) s += p[row + i] * h[i];
+          out[o] = s;
+        }
+      }
+
+      // dOut: d(loss)/d(out). 기울기는 this.g 에 누적
+      backward(x, h, dOut) {
+        const { nIn, nHid, nOut, p, g, oB1, oW2, oB2 } = this;
+        const dh = this._dh;
+        dh.fill(0);
+        for (let o = 0; o < nOut; o++) {
+          const d = dOut[o];
+          g[oB2 + o] += d;
+          const row = oW2 + o * nHid;
+          for (let i = 0; i < nHid; i++) {
+            g[row + i] += d * h[i];
+            dh[i] += d * p[row + i];
+          }
+        }
+        for (let i = 0; i < nHid; i++) {
+          const dpre = dh[i] * (1 - h[i] * h[i]);
+          g[oB1 + i] += dpre;
+          const row = i * nIn;
+          for (let j = 0; j < nIn; j++) g[row + j] += dpre * x[j];
+        }
+      }
+
+      step(lr, maxNorm = 0.5) {
+        const { p, g, m, v } = this;
+        let norm = 0;
+        for (let k = 0; k < g.length; k++) norm += g[k] * g[k];
+        norm = Math.sqrt(norm);
+        const scale = norm > maxNorm ? maxNorm / norm : 1;
+        this.t++;
+        const b1 = 0.9, b2 = 0.999;
+        const c1 = 1 - Math.pow(b1, this.t), c2 = 1 - Math.pow(b2, this.t);
+        for (let k = 0; k < g.length; k++) {
+          const gk = g[k] * scale;
+          m[k] = b1 * m[k] + (1 - b1) * gk;
+          v[k] = b2 * v[k] + (1 - b2) * gk * gk;
+          p[k] -= lr * (m[k] / c1) / (Math.sqrt(v[k] / c2) + 1e-8);
+          g[k] = 0;
+        }
+      }
+    }
+
+    // --- 1-D. PPO ACTOR-CRITIC (모든 RL 드론이 하나의 정책을 공유, 경험을 모아 경사하강) ---
+    class PPOAgent {
+      constructor(obsDim = 17, actDim = 3, hidden = 32) {
+        this.obsDim = obsDim; this.actDim = actDim;
+        this.actor = new TinyMLP(obsDim, hidden, actDim, actDim, 0.05); // 마지막 actDim 개 = log σ
+        this.critic = new TinyMLP(obsDim, hidden, 1, 0, 1.0);
+        for (let i = 0; i < actDim; i++) this.actor.p[this.actor.oExtra + i] = Math.log(0.5);
+
+        this.gamma = 0.99; this.lambda = 0.95; this.clipEps = 0.2;
+        this.epochs = 4; this.mbSize = 256; this.maxSamples = 8192;
+        this.entCoef = 0.003; this.vCoef = 0.5;
+        this.updates = 0;
+
+        this._h = new Float64Array(hidden); this._out = new Float64Array(actDim);
+        this._hc = new Float64Array(hidden); this._oc = new Float64Array(1);
+        this._dOut = new Float64Array(actDim); this._dV = new Float64Array(1);
+      }
+
+      meanStd() {
+        let s = 0;
+        for (let i = 0; i < this.actDim; i++) s += Math.exp(this.actor.p[this.actor.oExtra + i]);
+        return s / this.actDim;
+      }
+
+      value(obs) {
+        this.critic.forward(obs, this._hc, this._oc);
+        return this._oc[0];
+      }
+
+      act(obs) {
+        this.actor.forward(obs, this._h, this._out);
+        const action = [];
+        let logp = 0;
+        for (let i = 0; i < this.actDim; i++) {
+          const m = Math.tanh(this._out[i]);
+          const ls = this.actor.p[this.actor.oExtra + i];
+          const std = Math.exp(ls);
+          const a = m + std * randn();
+          logp += -0.5 * ((a - m) / std) ** 2 - ls - HALF_LOG_2PI;
+          action.push(a);
+        }
+        return { action, logp, value: this.value(obs) };
+      }
+
+      _accumulate(s, mb) {
+        const { actor, critic, actDim } = this;
+        const x = s.obs;
+        actor.forward(x, this._h, this._out);
+        const ms = [], stds = [], zs = [];
+        let logp = 0;
+        for (let i = 0; i < actDim; i++) {
+          const m = Math.tanh(this._out[i]);
+          const ls = actor.p[actor.oExtra + i];
+          const std = Math.exp(ls);
+          const z = (s.act[i] - m) / std;
+          logp += -0.5 * z * z - ls - HALF_LOG_2PI;
+          ms.push(m); stds.push(std); zs.push(z);
+        }
+        const ratio = Math.exp(clamp(logp - s.logp, -20, 20));
+        const A = s.adv;
+        const clipped = (A >= 0 && ratio > 1 + this.clipEps) || (A < 0 && ratio < 1 - this.clipEps);
+        if (clipped) this._clipCount++;
+        const coef = clipped ? 0 : -ratio * A / mb; // d(loss)/d(logp)
+        for (let i = 0; i < actDim; i++) {
+          this._dOut[i] = coef * (zs[i] / stds[i]) * (1 - ms[i] * ms[i]);
+          actor.g[actor.oExtra + i] += coef * (zs[i] * zs[i] - 1) - this.entCoef / mb;
+        }
+        actor.backward(x, this._h, this._dOut);
+
+        critic.forward(x, this._hc, this._oc);
+        const err = this._oc[0] - s.ret;
+        this._vLoss += 0.5 * err * err;
+        this._dV[0] = this.vCoef * err / mb;
+        critic.backward(x, this._hc, this._dV);
+      }
+
+      // trajs: [{ steps:[{obs,act,logp,v,r,done}], bootstrap }]
+      train(trajs, lr = 0.001) {
+        const samples = [];
+        for (const { steps, bootstrap } of trajs) {
+          let lastAdv = 0;
+          for (let t = steps.length - 1; t >= 0; t--) {
+            const s = steps[t];
+            const nonTerminal = s.done ? 0 : 1;
+            const nextV = (t === steps.length - 1) ? bootstrap : steps[t + 1].v;
+            const delta = s.r + this.gamma * nextV * nonTerminal - s.v;
+            lastAdv = delta + this.gamma * this.lambda * nonTerminal * lastAdv;
+            samples.push({ obs: s.obs, act: s.act, logp: s.logp, adv: lastAdv, ret: lastAdv + s.v });
+          }
+        }
+        if (samples.length < 32) return null;
+        if (samples.length > this.maxSamples) {
+          const total = samples.length;
+          for (let i = 0; i < this.maxSamples; i++) {
+            const j = i + Math.floor(Math.random() * (total - i));
+            const tmp = samples[i]; samples[i] = samples[j]; samples[j] = tmp;
+          }
+          samples.length = this.maxSamples;
+        }
+        const N = samples.length;
+        let mean = 0;
+        for (const s of samples) mean += s.adv;
+        mean /= N;
+        let vr = 0;
+        for (const s of samples) vr += (s.adv - mean) ** 2;
+        const sd = Math.sqrt(vr / N) + 1e-8;
+        for (const s of samples) s.adv = (s.adv - mean) / sd;
+
+        this._clipCount = 0; this._vLoss = 0;
+        const idx = Array.from({ length: N }, (_, i) => i);
+        for (let ep = 0; ep < this.epochs; ep++) {
+          for (let i = N - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = idx[i]; idx[i] = idx[j]; idx[j] = tmp;
+          }
+          for (let st = 0; st < N; st += this.mbSize) {
+            const en = Math.min(N, st + this.mbSize);
+            const mb = en - st;
+            for (let k = st; k < en; k++) this._accumulate(samples[idx[k]], mb);
+            this.actor.step(lr, 0.5);
+            this.critic.step(lr, 1.0);
+            for (let i = 0; i < this.actDim; i++) {
+              const k = this.actor.oExtra + i;
+              this.actor.p[k] = clamp(this.actor.p[k], -2.0, 0.3);
+            }
+          }
+        }
+        this.updates++;
+        const tot = N * this.epochs;
+        return { n: N, clipFrac: this._clipCount / tot, vLoss: this._vLoss / tot, std: this.meanStd() };
+      }
+    }
+
     // --- 2. CAR OBJECT ---
     class Car {
-      constructor(x, y, angle = 0, modelType = 'GA') {
+      constructor(x, y, angle = 0, modelType = 'GA', agent = null) {
         this.x = x;
         this.y = y;
         this.width = 28;
         this.height = 14;
         this.angle = angle;
-        
+
         this.speed = 0;
         this.maxSpeed = modelType === 'HUMAN' ? 4.5 : 4.0;
         this.friction = 0.04;
         this.acceleration = 0.15;
 
         this.modelType = modelType; // 'GA', 'RL', 'HUMAN'
+        this.agent = agent;         // RL: 모든 차량이 공유하는 PPO 정책
         this.damaged = false;
 
         this.sensorRayAngles = [-Math.PI / 2, -Math.PI / 4, 0, Math.PI / 4, Math.PI / 2];
         this.sensorRange = 160;
         this.readings = [];
 
-        if (modelType !== 'HUMAN') {
-          // 9 Inputs: 5 sensors + target rel sin + target rel cos + dist + speed
-          this.brain = new NeuralNetwork(9, 10, 2);
-        }
+        // GA: 9입력 (센서5 + 다음 체크포인트 sin/cos/거리 + 속도) -> 2출력(조향, 가감속)
+        if (modelType === 'GA') this.brain = new NeuralNetwork(9, 10, 2);
 
         this.fitness = 0;
         this.distanceTraveled = 0;
         this.currentCheckpoint = 0;
+        this.cpPassed = 0;
         this.lapsCompleted = 0;
         this.timeAlive = 0;
         this.timeSinceCheckpoint = 0;
 
-        this.lastInputs = null;
-        this.lastOutputs = null;
+        // RL 학습용
+        this.traj = [];
+        this.pending = null;
+        this.prevDist = null;
+        this.stepReward = 0;
       }
 
-      update(borders, checkpoints, keys = {}, epsilon = 0.1, learningRate = 0.05) {
+      update(borders, checkpoints, keys = {}) {
         if (this.damaged) return;
 
         this.timeAlive++;
         this.timeSinceCheckpoint++;
+        this.stepReward = 0;
 
         this.updateSensors(borders);
 
-        if (this.modelType === 'HUMAN') {
-          this.handleHumanControls(keys);
-        } else {
-          this.handleAIControls(checkpoints, epsilon, learningRate);
-        }
+        if (this.modelType === 'HUMAN') this.handleHumanControls(keys);
+        else if (this.modelType === 'GA') this.handleGAControls(checkpoints);
+        else this.handleRLControls(checkpoints);
 
         this.move();
         this.checkCollision(borders);
-        this.evaluateProgress(checkpoints);
+        if (!this.damaged) this.evaluateProgress(checkpoints);
+        else this.stepReward = -3;                       // 충돌 페널티
 
-        if (this.modelType !== 'HUMAN' && this.timeSinceCheckpoint > 260 && Math.abs(this.speed) < 0.3) {
+        // 한 바퀴 이상 진전이 없으면 제자리 맴돌기로 보고 종료
+        if (this.modelType !== 'HUMAN' && !this.damaged && this.timeSinceCheckpoint > 360) {
           this.damaged = true;
+          this.stepReward -= 2;
+        }
+
+        if (this.pending) {
+          this.traj.push({ ...this.pending, r: this.stepReward, done: this.damaged });
+          this.pending = null;
         }
       }
 
@@ -470,20 +702,12 @@
             y: this.y + Math.sin(rayAngle) * this.sensorRange
           };
 
-          let touches = [];
+          let closest = null;
           for (let j = 0; j < borders.length; j++) {
             const touch = getIntersection(rayStart, rayEnd, borders[j].p1, borders[j].p2);
-            if (touch) touches.push(touch);
+            if (touch && (!closest || touch.offset < closest.offset)) closest = touch;
           }
-
-          if (touches.length === 0) {
-            this.readings.push(null);
-          } else {
-            const offsets = touches.map(e => e.offset);
-            const minOffset = Math.min(...offsets);
-            const closestTouch = touches.find(e => e.offset === minOffset);
-            this.readings.push(closestTouch);
-          }
+          this.readings.push(closest);
         }
       }
 
@@ -498,65 +722,49 @@
         }
       }
 
-      handleAIControls(checkpoints, epsilon = 0.1, learningRate = 0.05) {
+      static wrapAngle(a) {
+        while (a > Math.PI) a -= Math.PI * 2;
+        while (a < -Math.PI) a += Math.PI * 2;
+        return a;
+      }
+
+      // 관측 벡터. rich=false: 9차원(GA) / rich=true: 11차원(RL, 그다음 체크포인트 방향 추가)
+      buildInputs(checkpoints, rich) {
         const inputs = [];
 
+        // 센서: 가까울수록 1, 감지 안 되면 0 (이전엔 '안 보임'과 '코앞'이 둘 다 1.0 이라 구분 불가였음)
         for (let i = 0; i < this.readings.length; i++) {
-          inputs.push(this.readings[i] == null ? 1.0 : 1.0 - this.readings[i].offset);
+          inputs.push(this.readings[i] == null ? 0.0 : 1.0 - this.readings[i].offset);
         }
 
-        if (checkpoints && checkpoints.length > 0) {
-          const nextCPIndex = (this.currentCheckpoint + 1) % checkpoints.length;
-          const targetCP = checkpoints[nextCPIndex];
-          const cpCenterX = (targetCP.p1.x + targetCP.p2.x) / 2;
-          const cpCenterY = (targetCP.p1.y + targetCP.p2.y) / 2;
-
-          const angleToTarget = Math.atan2(cpCenterY - this.y, cpCenterX - this.x);
-          let relativeAngle = angleToTarget - this.angle;
-
-          while (relativeAngle > Math.PI) relativeAngle -= Math.PI * 2;
-          while (relativeAngle < -Math.PI) relativeAngle += Math.PI * 2;
-
-          inputs.push(Math.sin(relativeAngle));
-          inputs.push(Math.cos(relativeAngle));
-
-          const distToCP = distance(this.x, this.y, cpCenterX, cpCenterY);
-          inputs.push(Math.min(1.0, distToCP / 500));
-        } else {
-          inputs.push(0, 1, 1);
-        }
-
+        const n = checkpoints.length;
+        const cpCenter = (cp) => ({ x: (cp.p1.x + cp.p2.x) / 2, y: (cp.p1.y + cp.p2.y) / 2 });
+        const c1 = cpCenter(checkpoints[(this.currentCheckpoint + 1) % n]);
+        const rel1 = Car.wrapAngle(Math.atan2(c1.y - this.y, c1.x - this.x) - this.angle);
+        inputs.push(Math.sin(rel1), Math.cos(rel1), Math.min(1.0, distance(this.x, this.y, c1.x, c1.y) / 500));
         inputs.push(this.speed / this.maxSpeed);
 
-        let outputs = this.brain.predict(inputs);
-
-        // Policy RL Online Exploration & Reward Feedback Update
-        if (this.modelType === 'RL') {
-          if (Math.random() < epsilon) {
-            outputs[0] = Math.random() * 2 - 1; // Random Steering
-            outputs[1] = Math.random() * 2 - 1; // Random Speed
-          }
-
-          if (this.lastInputs) {
-            // Immediate Reward Function: High speed towards checkpoint - penalty on wall proximity
-            const minWallDist = Math.min(...inputs.slice(0, 5));
-            let reward = this.speed > 0.5 ? 0.2 : -0.1;
-            if (minWallDist < 0.25) reward -= 0.5;
-
-            // Policy update
-            const gradients = [
-              outputs[0] * reward,
-              outputs[1] * reward
-            ];
-            this.brain.applyGradient(this.lastInputs, gradients, learningRate);
-          }
-
-          this.lastInputs = inputs;
-          this.lastOutputs = outputs;
+        if (rich) {
+          const c2 = cpCenter(checkpoints[(this.currentCheckpoint + 2) % n]);
+          const rel2 = Car.wrapAngle(Math.atan2(c2.y - this.y, c2.x - this.x) - this.angle);
+          inputs.push(Math.sin(rel2), Math.cos(rel2));
         }
+        return inputs;
+      }
 
+      handleGAControls(checkpoints) {
+        const outputs = this.brain.predict(this.buildInputs(checkpoints, false));
         this.angle += outputs[0] * 0.06;
         this.speed += outputs[1] * this.acceleration;
+      }
+
+      handleRLControls(checkpoints) {
+        const obs = this.buildInputs(checkpoints, true);
+        const { action, logp, value } = this.agent.act(obs);
+        const a = action.map(v => clamp(v, -1, 1));
+        this.angle += a[0] * 0.06;
+        this.speed += a[1] * this.acceleration;
+        this.pending = { obs, act: action, logp, v: value };
       }
 
       move() {
@@ -570,7 +778,7 @@
 
         this.x += Math.cos(this.angle) * this.speed;
         this.y += Math.sin(this.angle) * this.speed;
-        
+
         if (!this.damaged) {
           this.distanceTraveled += Math.abs(this.speed);
         }
@@ -619,8 +827,15 @@
       evaluateProgress(checkpoints) {
         if (!checkpoints || checkpoints.length === 0) return;
 
-        const targetCPIndex = (this.currentCheckpoint + 1) % checkpoints.length;
+        const n = checkpoints.length;
+        const targetCPIndex = (this.currentCheckpoint + 1) % n;
         const targetCP = checkpoints[targetCPIndex];
+        const tx = (targetCP.p1.x + targetCP.p2.x) / 2, ty = (targetCP.p1.y + targetCP.p2.y) / 2;
+        const dist = distance(this.x, this.y, tx, ty);
+
+        let reward = 0;
+        if (this.prevDist !== null) reward += (this.prevDist - dist) * 0.02; // 목표에 가까워진 만큼 밀집 보상
+        this.prevDist = dist;
 
         const poly = this.getPolygon();
         for (let i = 0; i < poly.length; i++) {
@@ -629,7 +844,11 @@
           const passed = getIntersection(p1, p2, targetCP.p1, targetCP.p2);
           if (passed) {
             this.currentCheckpoint = targetCPIndex;
+            this.cpPassed++;
             this.timeSinceCheckpoint = 0;
+            reward += 1.5;
+            const next = checkpoints[(targetCPIndex + 1) % n];
+            this.prevDist = distance(this.x, this.y, (next.p1.x + next.p2.x) / 2, (next.p1.y + next.p2.y) / 2);
             if (targetCPIndex === 0) {
               this.lapsCompleted++;
             }
@@ -637,7 +856,13 @@
           }
         }
 
-        this.fitness = (this.lapsCompleted * checkpoints.length + this.currentCheckpoint) * 600 + Math.floor(this.distanceTraveled);
+        // 벽에 바짝 붙으면 감점 (센서 가까움 정도 0.75 초과분)
+        let prox = 0;
+        for (const r of this.readings) if (r) prox = Math.max(prox, 1 - r.offset);
+        reward -= Math.max(0, prox - 0.75) * 1.0;
+
+        this.stepReward = reward;
+        this.fitness = this.cpPassed * 600 + Math.floor(this.distanceTraveled);
       }
 
       draw(ctx, showSensors = false, isLeader = false) {
@@ -702,6 +927,29 @@
         this.buildTrack(type);
       }
 
+      static isDrivable(outer, inner) {
+        const n = outer.length;
+        const segs = [];
+        for (let i = 0; i < n; i++) {
+          const j = (i + 1) % n;
+          segs.push({ a: outer[i], b: outer[j], i, s: 0 }, { a: inner[i], b: inner[j], i, s: 1 });
+        }
+        for (let x = 0; x < segs.length; x++) {
+          for (let y = x + 1; y < segs.length; y++) {
+            const p = segs[x], q = segs[y];
+            const adjacent = p.s === q.s && (Math.abs(p.i - q.i) === 1 || Math.abs(p.i - q.i) === n - 1);
+            if (adjacent) continue;
+            if (getIntersection(p.a, p.b, q.a, q.b)) return false;
+          }
+        }
+        // 인접 체크포인트 사이 간격이 너무 좁은(벽이 서로 거의 맞닿는) 코스 제외
+        for (let i = 0; i < n; i++) {
+          const j = (i + 1) % n;
+          if (distance(outer[i].x, outer[i].y, inner[j].x, inner[j].y) < 40) return false;
+        }
+        return true;
+      }
+
       buildTrack(type) {
         this.borders = [];
         this.checkpoints = [];
@@ -739,22 +987,27 @@
           this.startPos = { x: pts[0].x, y: pts[0].y, angle: startDir };
 
         } else if (type === 'procedural') {
-          const pointsCount = 14 + Math.floor(Math.random() * 6);
-          const rx = this.width * 0.38;
-          const ry = this.height * 0.36;
           const trackWidth = 130;
+          for (let attempt = 0; attempt < 60; attempt++) {
+            outerPoints = [];
+            innerPoints = [];
+            const pointsCount = 16 + Math.floor(Math.random() * 6);
+            const rx = this.width * 0.38;
+            const ry = this.height * 0.36;
+            const seed = Math.random() * 100;
+            const rMax = Math.min(cx, cy) - trackWidth / 2 - 10;
+            for (let i = 0; i < pointsCount; i++) {
+              const angle = (i / pointsCount) * Math.PI * 2;
+              const noise = Math.sin(angle * 4 + seed) * 60 + Math.cos(angle * 3 + seed * 2) * 40;
+              const rCenter = clamp(Math.min(rx, ry) + noise, trackWidth * 1.2, rMax);
 
-          const seed = Math.random() * 100;
-          for (let i = 0; i < pointsCount; i++) {
-            const angle = (i / pointsCount) * Math.PI * 2;
-            const noise = Math.sin(angle * 4 + seed) * 70 + Math.cos(angle * 3 + seed * 2) * 50;
-            const rCenter = Math.min(rx, ry) + noise;
+              const cX = cx + Math.cos(angle) * rCenter;
+              const cY = cy + Math.sin(angle) * rCenter;
 
-            const cX = cx + Math.cos(angle) * rCenter;
-            const cY = cy + Math.sin(angle) * rCenter;
-
-            outerPoints.push({ x: cX + Math.cos(angle) * (trackWidth / 2), y: cY + Math.sin(angle) * (trackWidth / 2) });
-            innerPoints.push({ x: cX - Math.cos(angle) * (trackWidth / 2), y: cY - Math.sin(angle) * (trackWidth / 2) });
+              outerPoints.push({ x: cX + Math.cos(angle) * (trackWidth / 2), y: cY + Math.sin(angle) * (trackWidth / 2) });
+              innerPoints.push({ x: cX - Math.cos(angle) * (trackWidth / 2), y: cY - Math.sin(angle) * (trackWidth / 2) });
+            }
+            if (Track.isDrivable(outerPoints, innerPoints)) break;
           }
 
           const dx = outerPoints[1].x - outerPoints[0].x;
@@ -804,7 +1057,7 @@
             { x: cx - w - 120 + trackWidth, y: cy }
           ];
 
-          this.startPos = { x: cx, y: cy + h - trackWidth / 2, angle: 0 };
+          this.startPos = { x: cx, y: cy + h - trackWidth / 2, angle: Math.PI };
         }
 
         for (let i = 0; i < outerPoints.length; i++) {
@@ -813,6 +1066,23 @@
           this.borders.push({ p1: innerPoints[i], p2: innerPoints[nextIndex] });
           this.checkpoints.push({ p1: innerPoints[i], p2: outerPoints[i] });
         }
+        this.startCheckpoint = this.computeStartCheckpoint();
+      }
+
+      // 출발점이 놓인 구간(체크포인트 k ~ k+1)을 찾아 k 를 반환 -> 차량의 '다음 목표'는 k+1
+      computeStartCheckpoint() {
+        const n = this.checkpoints.length;
+        const c = (cp) => ({ x: (cp.p1.x + cp.p2.x) / 2, y: (cp.p1.y + cp.p2.y) / 2 });
+        let best = 0, bestD = Infinity;
+        for (let i = 0; i < n; i++) {
+          const a = c(this.checkpoints[i]), b = c(this.checkpoints[(i + 1) % n]);
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const len2 = dx * dx + dy * dy || 1;
+          const t = Math.max(0, Math.min(1, ((this.startPos.x - a.x) * dx + (this.startPos.y - a.y) * dy) / len2));
+          const d = distance(this.startPos.x, this.startPos.y, a.x + t * dx, a.y + t * dy);
+          if (d < bestD - 1e-6) { bestD = d; best = i; }
+        }
+        return best;
       }
 
       draw(ctx) {
@@ -864,20 +1134,15 @@
         const resize = () => {
           this.canvas.width = this.canvas.parentElement.clientWidth - 16;
           this.canvas.height = this.canvas.parentElement.clientHeight - 16;
+          this.draw();
         };
         window.addEventListener('resize', resize);
         resize();
       }
 
-      addData(gaFitness, rlFitness) {
-        this.gaData.push(gaFitness);
-        this.rlData.push(rlFitness);
-        if (this.gaData.length > 30) {
-          this.gaData.shift();
-          this.rlData.shift();
-        }
-        this.draw();
-      }
+      // GA 세대와 RL 에피소드는 서로 독립적으로 진행되므로 따로 기록
+      addGA(v) { this.gaData.push(v); if (this.gaData.length > 60) this.gaData.shift(); this.draw(); }
+      addRL(v) { this.rlData.push(v); if (this.rlData.length > 60) this.rlData.shift(); this.draw(); }
 
       clear() {
         this.gaData = [];
@@ -890,11 +1155,10 @@
         const h = this.canvas.height;
         this.ctx.clearRect(0, 0, w, h);
 
-        if (this.gaData.length < 2) return;
-
         const maxFit = Math.max(...this.gaData, ...this.rlData, 1000);
 
         const drawLine = (data, color) => {
+          if (data.length < 2) return;
           this.ctx.beginPath();
           this.ctx.strokeStyle = color;
           this.ctx.lineWidth = 2.5;
@@ -926,7 +1190,11 @@
 
         this.gaGen = 1;
         this.rlEp = 1;
-        this.rlEpsilon = 1.0;
+        this.agent = new PPOAgent(11, 2, 32);
+        this.rlReturn = 0;
+        this.gaFrame = 0;
+        this.rlFrame = 0;
+        this.playerDeadTimer = 0;
 
         this.enableGA = true;
         this.enableRL = true;
@@ -951,8 +1219,10 @@
           const rect = this.canvas.parentElement.getBoundingClientRect();
           this.canvas.width = rect.width;
           this.canvas.height = rect.height;
-          if (this.track && !this.isEditingCustomTrack) {
-            this.track = new Track(document.getElementById('select-track').value, this.canvas.width, this.canvas.height, this.customWaypoints);
+          // 화면 크기가 바뀌면 고정형 코스만 다시 계산 (랜덤 코스가 창 크기 변경마다 바뀌던 문제 방지)
+          const type = document.getElementById('select-track').value;
+          if (this.track && !this.isEditingCustomTrack && type !== 'procedural') {
+            this.swapTrack(new Track(type, this.canvas.width, this.canvas.height, this.customWaypoints));
           }
         };
         window.addEventListener('resize', resize);
@@ -960,7 +1230,10 @@
       }
 
       initEvents() {
-        window.addEventListener('keydown', (e) => this.keys[e.key] = true);
+        window.addEventListener('keydown', (e) => {
+          if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+          this.keys[e.key] = true;
+        });
         window.addEventListener('keyup', (e) => this.keys[e.key] = false);
 
         this.canvas.addEventListener('click', (e) => {
@@ -985,10 +1258,12 @@
 
         document.getElementById('chk-enable-ga').addEventListener('change', (e) => {
           this.enableGA = e.target.checked;
+          this.respawnAll();
         });
 
         document.getElementById('chk-enable-rl').addEventListener('change', (e) => {
           this.enableRL = e.target.checked;
+          this.respawnAll();
         });
 
         const selectTrack = document.getElementById('select-track');
@@ -1006,14 +1281,12 @@
           } else {
             this.isEditingCustomTrack = false;
             editorBanner.classList.add('hidden');
-            this.track = new Track(val, this.canvas.width, this.canvas.height);
-            this.resetSimulation();
+            this.swapTrack(new Track(val, this.canvas.width, this.canvas.height));
           }
         });
 
         btnGenRandom.addEventListener('click', () => {
-          this.track = new Track('procedural', this.canvas.width, this.canvas.height);
-          this.resetSimulation();
+          this.swapTrack(new Track('procedural', this.canvas.width, this.canvas.height));
         });
 
         document.getElementById('btn-clear-track').addEventListener('click', () => {
@@ -1027,21 +1300,21 @@
           }
           this.isEditingCustomTrack = false;
           editorBanner.classList.add('hidden');
-          this.track = new Track('custom', this.canvas.width, this.canvas.height, this.customWaypoints);
-          this.resetSimulation();
+          this.swapTrack(new Track('custom', this.canvas.width, this.canvas.height, this.customWaypoints));
         });
 
         document.getElementById('btn-restart').addEventListener('click', () => {
           this.gaGen = 1;
           this.rlEp = 1;
-          this.rlEpsilon = 1.0;
+          this.agent = new PPOAgent(11, 2, 32);
+          this.rlReturn = 0;
           this.chart.clear();
           this.resetSimulation();
         });
 
         document.getElementById('btn-next-gen').addEventListener('click', () => {
-          this.evolveGABatch();
-          this.resetRLBatch();
+          this.chart.addGA(this.evolveGABatch());
+          this.endRLEpisode();
         });
 
         document.getElementById('btn-toggle-sensors').addEventListener('click', () => {
@@ -1056,9 +1329,7 @@
           const statusText = document.getElementById('player-status-text');
           statusText.textContent = this.enablePlayer ? '켜짐' : '꺼짐';
           statusText.className = this.enablePlayer ? 'text-emerald-400' : 'text-slate-400';
-          if (this.enablePlayer && !this.playerCar) {
-            this.playerCar = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'HUMAN');
-          }
+          this.playerCar = this.enablePlayer ? this.spawnPlayer() : null;
         });
 
         const speedButtons = document.querySelectorAll('.speed-btn');
@@ -1071,45 +1342,75 @@
         });
       }
 
+      // ---------- 트랙 교체 (학습 결과는 유지한 채 새 코스에 재배치) ----------
+      swapTrack(newTrack) {
+        this.trainRL();
+        this.track = newTrack;
+        this.respawnAll();
+      }
+
+      spawnGA(brain = null) {
+        const s = this.track.startPos;
+        const car = new Car(s.x, s.y, s.angle, 'GA');
+        if (brain) car.brain = brain;
+        car.currentCheckpoint = this.track.startCheckpoint;
+        return car;
+      }
+
+      spawnRL() {
+        const s = this.track.startPos;
+        // 출발 위치/각도에 약간의 무작위성을 줘서 정책이 한 궤적만 외우지 않게 함
+        const jitter = (Math.random() - 0.5) * 0.2;
+        const car = new Car(s.x, s.y, s.angle + jitter, 'RL', this.agent);
+        car.currentCheckpoint = this.track.startCheckpoint;
+        return car;
+      }
+
+      spawnPlayer() {
+        const s = this.track.startPos;
+        const car = new Car(s.x, s.y, s.angle, 'HUMAN');
+        car.currentCheckpoint = this.track.startCheckpoint;
+        return car;
+      }
+
       resetSimulation() {
         if (!this.track) {
           this.track = new Track('oval', this.canvas.width, this.canvas.height);
         }
 
-        this.gaCars = [];
-        if (this.enableGA) {
-          for (let i = 0; i < this.popSize; i++) {
-            this.gaCars.push(new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'GA'));
-          }
-        }
-
-        this.rlCars = [];
-        if (this.enableRL) {
-          for (let i = 0; i < this.popSize; i++) {
-            this.rlCars.push(new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'RL'));
-          }
-        }
-
-        this.playerCar = this.enablePlayer ? new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'HUMAN') : null;
-        this.frameCount = 0;
+        this.gaCars = this.enableGA ? Array.from({ length: this.popSize }, () => this.spawnGA()) : [];
+        this.rlCars = this.enableRL ? Array.from({ length: this.popSize }, () => this.spawnRL()) : [];
+        this.playerCar = this.enablePlayer ? this.spawnPlayer() : null;
+        this.gaFrame = 0;
+        this.rlFrame = 0;
+        this.playerDeadTimer = 0;
       }
 
+      respawnAll() {
+        const brains = this.gaCars.map(c => c.brain);
+        this.gaCars = this.enableGA
+          ? (brains.length ? brains.map(b => this.spawnGA(b)) : Array.from({ length: this.popSize }, () => this.spawnGA()))
+          : [];
+        this.rlCars = this.enableRL ? Array.from({ length: this.popSize }, () => this.spawnRL()) : [];
+        this.playerCar = this.enablePlayer ? this.spawnPlayer() : null;
+        this.gaFrame = 0;
+        this.rlFrame = 0;
+        this.playerDeadTimer = 0;
+      }
+
+      // ---------- GA ----------
       evolveGABatch() {
-        if (this.gaCars.length === 0) return;
+        if (this.gaCars.length === 0) return 0;
 
         this.gaCars.sort((a, b) => b.fitness - a.fitness);
         const bestGA = this.gaCars[0].fitness;
 
-        const newGACars = [];
+        const newBrains = [];
         const eliteCount = Math.max(1, Math.floor(this.popSize * 0.1));
 
-        for (let i = 0; i < eliteCount; i++) {
-          const elite = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'GA');
-          elite.brain = this.gaCars[i].brain.clone();
-          newGACars.push(elite);
-        }
+        for (let i = 0; i < eliteCount; i++) newBrains.push(this.gaCars[i].brain.clone());
 
-        while (newGACars.length < this.popSize) {
+        while (newBrains.length < this.popSize) {
           const pA = this.selectGAParent();
           const pB = this.selectGAParent();
           const childBrain = pA.brain.clone();
@@ -1120,14 +1421,12 @@
             }
           }
           childBrain.mutate(this.mutationRate);
-
-          const child = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'GA');
-          child.brain = childBrain;
-          newGACars.push(child);
+          newBrains.push(childBrain);
         }
 
-        this.gaCars = newGACars;
+        this.gaCars = newBrains.map(b => this.spawnGA(b));
         this.gaGen++;
+        this.gaFrame = 0;
         return bestGA;
       }
 
@@ -1140,33 +1439,44 @@
         return best;
       }
 
-      resetRLBatch() {
-        if (this.rlCars.length === 0) return;
+      // ---------- RL (PPO) ----------
+      rlLearningRate() {
+        return 0.0002 + this.mutationRate * 0.008; // 슬라이더 1%~40% -> 약 3e-4 ~ 3.4e-3
+      }
 
-        this.rlCars.sort((a, b) => b.fitness - a.fitness);
-        const bestRL = this.rlCars[0].fitness;
-
-        const topBrain = this.rlCars[0].brain.clone();
-        this.rlEpsilon = Math.max(0.05, this.rlEpsilon * 0.92);
-
-        const newRLCars = [];
-        for (let i = 0; i < this.popSize; i++) {
-          const car = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'RL');
-          car.brain = topBrain.clone();
-          if (i > 0) car.brain.mutate(this.mutationRate * 0.5);
-          newRLCars.push(car);
+      // 지금까지 모인 모든 차량의 경험으로 정책을 한 번 업데이트
+      trainRL() {
+        const trajs = [];
+        let bestFit = 0, retSum = 0, n = 0;
+        for (const c of this.rlCars) {
+          bestFit = Math.max(bestFit, c.fitness);
+          if (c.traj.length === 0) continue;
+          const bootstrap = c.damaged ? 0 : this.agent.value(c.buildInputs(this.track.checkpoints, true));
+          trajs.push({ steps: c.traj, bootstrap });
+          retSum += c.traj.reduce((s, x) => s + x.r, 0);
+          n++;
         }
+        if (trajs.length) this.agent.train(trajs, this.rlLearningRate());
+        if (n) this.rlReturn = this.rlReturn === 0 ? retSum / n : 0.8 * this.rlReturn + 0.2 * (retSum / n);
+        return bestFit;
+      }
 
-        this.rlCars = newRLCars;
+      endRLEpisode() {
+        if (this.rlCars.length === 0) return 0;
+        const bestFit = this.trainRL();
+        this.chart.addRL(bestFit);
+        this.rlCars = Array.from({ length: this.popSize }, () => this.spawnRL());
         this.rlEp++;
-        return bestRL;
+        this.rlFrame = 0;
+        return bestFit;
       }
 
       update() {
         if (this.isEditingCustomTrack) return;
 
         for (let step = 0; step < this.simSpeed; step++) {
-          this.frameCount++;
+          this.gaFrame++;
+          this.rlFrame++;
 
           let gaAlive = 0;
           for (let car of this.gaCars) {
@@ -1176,32 +1486,32 @@
 
           let rlAlive = 0;
           for (let car of this.rlCars) {
-            car.update(this.track.borders, this.track.checkpoints, {}, this.rlEpsilon, this.mutationRate * 0.5);
+            car.update(this.track.borders, this.track.checkpoints);
             if (!car.damaged) rlAlive++;
           }
 
           if (this.playerCar) {
             this.playerCar.update(this.track.borders, this.track.checkpoints, this.keys);
+            if (this.playerCar.damaged && ++this.playerDeadTimer > 60) { // 충돌 1초 뒤 출발점에서 부활
+              this.playerCar = this.spawnPlayer();
+              this.playerDeadTimer = 0;
+            }
           }
 
-          const totalAlive = gaAlive + rlAlive;
-          if (totalAlive === 0 || this.frameCount > 1800) {
-            const bestGA = this.evolveGABatch() || 0;
-            const bestRL = this.resetRLBatch() || 0;
-
-            this.chart.addData(bestGA, bestRL);
+          // GA 세대 종료 (RL과 독립)
+          if (this.gaCars.length && (gaAlive === 0 || this.gaFrame > 1800)) {
+            this.chart.addGA(this.evolveGABatch());
 
             if (this.autoRegenTrack) {
               const currentTrackType = document.getElementById('select-track').value;
-              this.track = new Track(currentTrackType === 'custom' ? 'custom' : 'procedural', this.canvas.width, this.canvas.height, this.customWaypoints);
+              this.swapTrack(new Track(currentTrackType === 'custom' ? 'custom' : 'procedural', this.canvas.width, this.canvas.height, this.customWaypoints));
+              break; // 트랙이 바뀌었으니 이번 프레임은 여기서 종료
             }
+          }
 
-            if (this.playerCar) {
-              this.playerCar = new Car(this.track.startPos.x, this.track.startPos.y, this.track.startPos.angle, 'HUMAN');
-            }
-
-            this.frameCount = 0;
-            break;
+          // RL 에피소드 종료: 전원 추락하면 기다리지 않고 바로 학습
+          if (this.rlCars.length && (rlAlive === 0 || this.rlFrame > 1800)) {
+            this.endRLEpisode();
           }
         }
       }
@@ -1267,7 +1577,8 @@
 
         if (leaderRL) {
           document.getElementById('stat-rl-fit').textContent = Math.floor(leaderRL.fitness);
-          document.getElementById('stat-rl-epsilon').textContent = `${(this.rlEpsilon * 100).toFixed(0)}%`;
+          document.getElementById('stat-rl-std').textContent = this.agent.meanStd().toFixed(2);
+          document.getElementById('stat-rl-ret').textContent = this.rlReturn.toFixed(1);
         }
       }
 
